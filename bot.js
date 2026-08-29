@@ -125,15 +125,21 @@ const commands = [
         options: [
             {
                 name: 'identifiant',
-                description: 'Votre nom d\'utilisateur Riot Games (login)',
+                description: 'Option 1: Votre nom d\'utilisateur Riot Games (login)',
                 type: ApplicationCommandOptionType.String,
-                required: true
+                required: false
             },
             {
                 name: 'mot_de_passe',
-                description: 'Votre mot de passe Riot Games',
+                description: 'Option 1: Votre mot de passe Riot Games',
                 type: ApplicationCommandOptionType.String,
-                required: true
+                required: false
+            },
+            {
+                name: 'lien',
+                description: 'Option 2: Collez directement votre lien officiel Riot (https://playvalorant.com/...#access_token=...)',
+                type: ApplicationCommandOptionType.String,
+                required: false
             }
         ]
     },
@@ -348,67 +354,125 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName } = interaction;
 
-    // 1. /login Command (Direct RSO Authentication)
+    // 1. /login Command (Direct RSO Authentication or Official Link)
     if (commandName === 'login') {
         await interaction.deferReply({ ephemeral: true });
 
         const username = interaction.options.getString('identifiant');
         const password = interaction.options.getString('mot_de_passe');
+        const linkArg = interaction.options.getString('lien');
 
-        try {
-            const result = await loginRiotRSO(username, password);
-
-            if (result.requires2FA) {
-                // Save pending challenge for this user (expires in 10 minutes)
-                pending2FAMap.set(interaction.user.id, {
-                    cookies: result.cookies,
-                    expiresAt: Date.now() + 10 * 60 * 1000
+        // Case A: Link Provided
+        if (linkArg) {
+            const extracted = extractTokensFromUri(linkArg);
+            if (!extracted.accessToken) {
+                return interaction.editReply({
+                    content: `❌ **Le lien fourni est invalide.**\nAssurez-vous qu'il contient \`access_token=...\` et provient bien de Riot Games.`
                 });
+            }
+
+            try {
+                const sessionData = await buildSessionPayload(extracted.accessToken, extracted.idToken, {});
+                const encryptedSession = encryptData(sessionData);
+
+                const existingUser = await knex('users').where({ discord_id: interaction.user.id }).first();
+                if (existingUser) {
+                    await knex('users').where({ discord_id: interaction.user.id }).update({
+                        username: interaction.user.username,
+                        avatar: interaction.user.displayAvatarURL(),
+                        riot_auth: encryptedSession
+                    });
+                } else {
+                    await knex('users').insert({
+                        discord_id: interaction.user.id,
+                        username: interaction.user.username,
+                        avatar: interaction.user.displayAvatarURL(),
+                        riot_auth: encryptedSession
+                    });
+                }
 
                 return interaction.editReply({
-                    content: `🔐 **Code 2FA Requis !**\nUn code de sécurité a été envoyé à **${result.email}**.\n👉 Tapez **/2fa code: 123456** pour finaliser votre connexion.`
+                    content: `✅ **Compte Riot lié avec succès !**\n` +
+                             `👤 **Joueur :** **${sessionData.username}**\n` +
+                             `🌐 **Région :** ${sessionData.shard.toUpperCase()}\n\n` +
+                             `👉 Tapez **/boutique** ou **/store** pour consulter vos 4 skins du jour et vos soldes !`
                 });
-            }
-
-            if (!result.success) {
+            } catch (err) {
                 return interaction.editReply({
-                    content: `❌ **Échec de connexion Riot Games :**\n${result.error || 'Identifiant ou mot de passe incorrect.'}`
+                    content: `❌ Impossible de valider le jeton Riot : ${err.message}`
                 });
             }
-
-            // Encrypt and store persistent session
-            const encryptedSession = encryptData(result.session);
-
-            const existingUser = await knex('users').where({ discord_id: interaction.user.id }).first();
-            if (existingUser) {
-                await knex('users').where({ discord_id: interaction.user.id }).update({
-                    username: interaction.user.username,
-                    avatar: interaction.user.displayAvatarURL(),
-                    riot_auth: encryptedSession
-                });
-            } else {
-                await knex('users').insert({
-                    discord_id: interaction.user.id,
-                    username: interaction.user.username,
-                    avatar: interaction.user.displayAvatarURL(),
-                    riot_auth: encryptedSession
-                });
-            }
-
-            return interaction.editReply({
-                content: `✅ **Compte Riot connecté avec succès !**\n` +
-                         `👤 **Joueur :** **${result.session.username}**\n` +
-                         `🌐 **Région :** ${result.session.shard.toUpperCase()}\n\n` +
-                         `🔒 *Votre mot de passe n'est pas conservé. Votre session est chiffrée (AES-256) et reste persistante.*\n` +
-                         `👉 Tapez **/boutique** ou **/store** à tout moment pour voir vos skins du jour !`
-            });
-
-        } catch (err) {
-            console.error('[RadianiteBot] Erreur /login:', err);
-            return interaction.editReply({
-                content: `❌ Une erreur inattendue est survenue lors de la connexion. Veuillez réessayer.`
-            });
         }
+
+        // Case B: Credentials Provided
+        if (username && password) {
+            try {
+                const result = await loginRiotRSO(username, password);
+
+                if (result.requires2FA) {
+                    // Save pending challenge for this user (expires in 10 minutes)
+                    pending2FAMap.set(interaction.user.id, {
+                        cookies: result.cookies,
+                        expiresAt: Date.now() + 10 * 60 * 1000
+                    });
+
+                    return interaction.editReply({
+                        content: `🔐 **Code 2FA Requis !**\nUn code de sécurité a été envoyé à **${result.email}**.\n👉 Tapez **/2fa code: 123456** pour finaliser votre connexion.`
+                    });
+                }
+
+                if (!result.success) {
+                    return interaction.editReply({
+                        content: `❌ **Échec de connexion Riot Games :**\n${result.error || 'Identifiant ou mot de passe incorrect.'}`
+                    });
+                }
+
+                // Encrypt and store persistent session
+                const encryptedSession = encryptData(result.session);
+
+                const existingUser = await knex('users').where({ discord_id: interaction.user.id }).first();
+                if (existingUser) {
+                    await knex('users').where({ discord_id: interaction.user.id }).update({
+                        username: interaction.user.username,
+                        avatar: interaction.user.displayAvatarURL(),
+                        riot_auth: encryptedSession
+                    });
+                } else {
+                    await knex('users').insert({
+                        discord_id: interaction.user.id,
+                        username: interaction.user.username,
+                        avatar: interaction.user.displayAvatarURL(),
+                        riot_auth: encryptedSession
+                    });
+                }
+
+                return interaction.editReply({
+                    content: `✅ **Compte Riot connecté avec succès !**\n` +
+                             `👤 **Joueur :** **${result.session.username}**\n` +
+                             `🌐 **Région :** ${result.session.shard.toUpperCase()}\n\n` +
+                             `🔒 *Votre mot de passe n'est pas conservé. Votre session est chiffrée (AES-256) et reste persistante.*\n` +
+                             `👉 Tapez **/boutique** ou **/store** à tout moment pour voir vos skins du jour !`
+                });
+
+            } catch (err) {
+                console.error('[RadianiteBot] Erreur /login:', err);
+                return interaction.editReply({
+                    content: `❌ Une erreur inattendue est survenue lors de la connexion. Veuillez réessayer.`
+                });
+            }
+        }
+
+        // Case C: Neither provided
+        const authUrl = "https://auth.riotgames.com/authorize?client_id=play-valorant-web-prod&response_type=token%20id_token&redirect_uri=https%3A%2F%2Fplayvalorant.com%2Fopt_in&scope=account%20openid&nonce=1";
+        return interaction.editReply({
+            content: `🔑 **Comment connecter votre compte Riot au Bot :**\n\n` +
+                     `**Méthode 1 (Identifiants) :**\n` +
+                     `Tapez **/login identifiant: ... mot_de_passe: ...**\n` +
+                     `*(Utilisez votre Nom d'utilisateur Riot Client launcher, et non votre pseudo en jeu)*\n\n` +
+                     `**Méthode 2 (Lien 1-Clic) :**\n` +
+                     `1. Ouvrez : <${authUrl}>\n` +
+                     `2. Tapez \`/login lien: https://playvalorant.com/opt_in#access_token=...\``
+        });
     }
 
     // 2. /2fa Command

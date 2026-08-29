@@ -47,15 +47,21 @@ const commands = [
         options: [
             {
                 name: 'identifiant',
-                description: 'Votre nom d\'utilisateur Riot Games (login)',
+                description: 'Option 1: Votre nom d\'utilisateur Riot Games (login)',
                 type: ApplicationCommandOptionType.String,
-                required: true
+                required: false
             },
             {
                 name: 'mot_de_passe',
-                description: 'Votre mot de passe Riot Games',
+                description: 'Option 1: Votre mot de passe Riot Games',
                 type: ApplicationCommandOptionType.String,
-                required: true
+                required: false
+            },
+            {
+                name: 'lien',
+                description: 'Option 2: Collez directement votre lien officiel Riot (https://playvalorant.com/...#access_token=...)',
+                type: ApplicationCommandOptionType.String,
+                required: false
             }
         ]
     },
