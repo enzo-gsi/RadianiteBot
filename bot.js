@@ -278,7 +278,7 @@ client.on('interactionCreate', async interaction => {
             const tierNum = (rInfo.tier !== undefined && rInfo.tier !== null) ? rInfo.tier : 18;
             const rrNum = rInfo.rr || 0;
             const lastChangeNum = rInfo.lastRRChange || 0;
-            const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=360`;
+            const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=360&v=3&t=${Date.now()}`;
 
             const embed = new EmbedBuilder()
                 .setAuthor({
@@ -540,7 +540,7 @@ async function checkFollowedPlayers() {
                     } catch (e) {}
 
                     // Construction de la Roue de Rang Dynamique (Gain Vert / Perte Rouge / Rankup Or)
-                    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&rankup=${isRankup ? 1 : 0}&size=360`;
+                    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&rankup=${isRankup ? 1 : 0}&size=360&v=3&t=${Date.now()}`;
 
                     // Construction du somptueux Embed tactique
                     const embedColor = isRankup ? 0xFFE853 : (isWin ? 0x00F5D4 : 0xFF4655);
