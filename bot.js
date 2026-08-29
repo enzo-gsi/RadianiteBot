@@ -1381,6 +1381,7 @@ async function checkFollowedPlayers() {
             'users.show_rank_wheel',
             'users.notify_mentions',
             'users.notify_rankup_only',
+            'users.notify_game_modes',
             'users.language'
         );
 
@@ -1514,15 +1515,18 @@ async function checkFollowedPlayers() {
     }
 
     // 3. Group by User/Channel and Match ID (DuoQ / TrioQ / 5-STACK grouping)
-    const userSubs = new Map(); // discord_id -> { channel, user, showRankWheel, notifyMentions, notifyRankupOnly, language, followedRiotIds: [] }
+    const userSubs = new Map(); // discord_id -> { channel, user, showRankWheel, notifyMentions, notifyRankupOnly, notifyGameModes, language, followedRiotIds: [] }
     for (const sub of subscriptions) {
         if (!userSubs.has(sub.discord_id)) {
+            let gameModes = null;
+            try { gameModes = sub.notify_game_modes ? JSON.parse(sub.notify_game_modes) : null; } catch {}
             userSubs.set(sub.discord_id, {
                 channel: sub.discord_channel_id,
                 user: sub.discord_id,
                 showRankWheel: sub.show_rank_wheel !== false,
                 notifyMentions: sub.notify_mentions !== false,
                 notifyRankupOnly: sub.notify_rankup_only === true,
+                notifyGameModes: Array.isArray(gameModes) && gameModes.length > 0 ? gameModes : null,
                 language: sub.language || 'en',
                 followedRiotIds: []
             });
@@ -1540,6 +1544,23 @@ async function checkFollowedPlayers() {
                 
                 // Respect notify_rankup_only
                 if (userData.notifyRankupOnly && (!matchData.isCompetitive || !matchData.isRankUp)) continue;
+
+                // Respect notify_game_modes filter
+                if (userData.notifyGameModes) {
+                    const rawMode = (matchData.match.metadata?.mode || matchData.match.metadata?.queue || '').toLowerCase();
+                    const matchedMode = (() => {
+                        if (rawMode.includes('competitive') || rawMode.includes('ranked')) return 'competitive';
+                        if (rawMode.includes('deathmatch') && !rawMode.includes('team')) return 'deathmatch';
+                        if (rawMode.includes('teamdeathmatch') || rawMode.includes('hurm') || rawMode.includes('team_deathmatch')) return 'teamdeathmatch';
+                        if (rawMode.includes('swiftplay')) return 'swiftplay';
+                        if (rawMode.includes('spikerush') || rawMode.includes('spike_rush')) return 'spikerush';
+                        if (rawMode.includes('unrated')) return 'unrated';
+                        if (rawMode.includes('premier')) return 'premier';
+                        if (rawMode.includes('custom')) return 'custom';
+                        return rawMode;
+                    })();
+                    if (!userData.notifyGameModes.includes(matchedMode)) continue;
+                }
                 
                 if (!userNewMatches.has(matchData.matchId)) {
                     userNewMatches.set(matchData.matchId, []);
