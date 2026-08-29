@@ -19,13 +19,12 @@
 
 ## ⚡ Fonctionnalités Clés
 
-- **🛒 Boutique Valorant en Direct (`/boutique`, `/store`, `/shop`)** : Affichez vos 4 skins quotidiens, vos soldes réels de VP, RP et Kingdom Credits, ainsi que le Marché Nocturne directement sur Discord !
-- **🔐 Connexion Directe Riot Sécurisée (`/login`, `/2fa`)** : Authentification persistante avec chiffrement **AES-256-GCM** (mot de passe jamais stocké en clair, renouvellement automatique de session).
+- **🛒 Boutique Valorant en Direct (`/boutique`, `/store`, `/shop`)** : Affichez vos 4 skins quotidiens en grand format, vos soldes réels de VP, RP et Kingdom Credits, ainsi que le Marché Nocturne.
+- **⭐ Wishlist & Alertes Privées Automatiques (`/wishlist`)** : Enregistrez vos skins de rêve avec autocomplétion intelligente ; recevez un **Message Privé (MP)** dès que le skin apparaît dans votre boutique à 02h00 !
+- **🕵️ Dossier Tactique & Scouting en Direct (`/scout`)** : Analyse le lobby en direct, les rangs actuels, les Peak Ranks, le K/D moyen et l'agent de prédilection.
+- **🏆 Classement Compétitif du Serveur (`/classement`)** : Leaderboard en temps réel des joueurs suivis ordonné par Rang et RR avec médailles (🥇, 🥈, 🥉).
+- **☀️ Rapport de Session Automatique (`/session` & Cron 10h00)** : Bilan complet des parties des dernières 24h (Victoires, Défaites, Winrate %, K/D, ACS, Agent phare), envoyé automatiquement chaque matin à **10h00**.
 - **🚨 Alertes de Fin de Match Groupées (DuoQ / TrioQ / 5-Stack)** : Combine tous les joueurs d'une même partie en un seul rapport épuré avec **bannières horizontales larges** délimitant chaque profil.
-- **🎯 Filtrage Intelligent des Modes** :
-  - **Ranked (Compétitif)** : Affiche les stats complètes et l'évolution précise de RR (`+22 RR`).
-  - **Non-Classé / Véloce / Spike Rush** : Affiche les stats pures et l'avatar de l'agent sans mention de RR ni de roue.
-  - **Match à Mort (Deathmatch)** : Affiche le score en **Kills / Morts** et le classement final (`Top 1 (Victoire)`).
 
 ---
 
@@ -34,12 +33,16 @@
 | Commande | Options | Description |
 | :--- | :--- | :--- |
 | **`/boutique`** | `[lien_ou_token]` | Affiche votre boutique Valorant du jour, vos soldes VP/RP/KC et le Marché Nocturne. |
-| **`/store`** | `[lien_ou_token]` | Alias de `/boutique`. |
-| **`/shop`** | `[lien_ou_token]` | Alias de `/boutique`. |
-| **`/login`** | `identifiant:` `mot_de_passe:` | Connecte votre compte Riot de manière sécurisée (session persistante chiffrée AES-256). |
+| **`/wishlist ajouter`** | `skin: [Nom]` | Ajoute un skin à surveiller avec autocomplétion dynamique. |
+| **`/wishlist retirer`** | `skin: [Nom]` | Retire un skin de votre liste de surveillance. |
+| **`/wishlist liste`** | *Aucune* | Affiche tous vos skins actuellement surveillés. |
+| **`/scout`** | `[joueur: Pseudo#TAG]` | Analyse tactique et scouting complet des rangs, Peak Rank et K/D d'un joueur. |
+| **`/classement`** | *Aucune* | Classement compétitif des joueurs suivis sur le serveur. |
+| **`/session`** | `[joueur: Pseudo#TAG]` | Rapport des performances et gains/pertes de RR des dernières 24 heures. |
+| **`/login`** | `[identifiant]` `[mdp]` `[lien]` | Connecte votre compte Riot de manière persistante (chiffrement AES-256). |
 | **`/2fa`** | `code:` | Valide le code de double authentification Riot Games reçu par email. |
 | **`/unlink`** | *Aucune* | Supprime définitivement votre session Riot enregistrée sur le bot. |
-| **`/setchannel`** | *Aucune* | Définit le salon textuel où le bot doit publier les alertes de match. |
+| **`/setchannel`** | *Aucune* | Définit le salon textuel pour les alertes de match et briefings matinaux. |
 
 ---
 
