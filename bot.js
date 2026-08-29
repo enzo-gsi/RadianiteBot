@@ -1794,6 +1794,27 @@ async function checkFollowedPlayers() {
 
                 const finalEmbeds = embedsToSend.slice(0, 10);
 
+                // Build Action Buttons linking to each player's profile on RadianiteDB
+                const actionComponents = [];
+                const buttonRow = new ActionRowBuilder();
+
+                squadPlayers.slice(0, 5).forEach(pData => {
+                    const [pName, pTag] = (pData.riotId || '').split('#');
+                    const profileUrl = `${YOUR_WEBSITE_URL}/?player=${encodeURIComponent(pName || '')}%23${encodeURIComponent(pTag || '')}`;
+                    
+                    buttonRow.addComponents(
+                        new ButtonBuilder()
+                            .setLabel(squadPlayers.length === 1 ? 'Voir le Profil' : `${pName}`)
+                            .setStyle(ButtonStyle.Link)
+                            .setURL(profileUrl)
+                            .setEmoji('📊')
+                    );
+                });
+
+                if (buttonRow.components.length > 0) {
+                    actionComponents.push(buttonRow);
+                }
+
                 const mentionPrefix = userData.notifyMentions ? `<@${userData.user}>, ` : '';
                 const matchMsg = isEn 
                     ? `${mentionPrefix}${isSquad ? `your tracked players in **${squadTitle}** finished their match (${modeDisplay})!` : `**${first.riotId}** finished their match (${modeDisplay})!`}`
@@ -1801,7 +1822,8 @@ async function checkFollowedPlayers() {
 
                 await channel.send({
                     content: matchMsg,
-                    embeds: finalEmbeds
+                    embeds: finalEmbeds,
+                    components: actionComponents
                 });
                 incrementBotStat('match_notifications_sent');
 
