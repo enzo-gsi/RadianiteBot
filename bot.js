@@ -697,7 +697,10 @@ async function checkFollowedPlayers() {
                                 .setTitle(`${resultTitle} • ${mapName.toUpperCase()}`)
                                 .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
                                 .setColor(embedColor)
-                                .setDescription(`${isRankup ? `> 👑 **${tLang.rank_up_banner} ${currentRankStr} (${currentRRNum} RR)**\n` : ''}`)
+                                .setDescription(isRankup 
+                                    ? `> 👑 **${tLang.rank_up_banner} ${currentRankStr} (${currentRRNum} RR)**`
+                                    : `> ⚔️ **${latestMatch.metadata?.mode || 'Competitive'}** • Score: **${teamData.rounds_won} - ${teamData.rounds_lost}**`
+                                )
                                 .setThumbnail(agentIcon || LOGO_ICON_URL)
                                 .addFields(
                                     { name: tLang.played_agent, value: `**${agentName}**`, inline: true },
@@ -706,10 +709,15 @@ async function checkFollowedPlayers() {
                                     { name: tLang.precision, value: `**${hsPercent}% HS**\n(${headshots} heads)`, inline: true },
                                     { name: tLang.current_rank, value: `**${currentRankStr}**\n(${currentRRNum} RR)`, inline: true },
                                     { name: tLang.mmr_change, value: rrChangeStr ? `**${isRankup ? '★ ' : ''}${rrChangeStr}**` : `*${tLang.updated}*`, inline: true }
-                                )
-                                .setImage(target.show_rank_wheel !== false ? rankWheelUrl : mapSplash)
-                                .setFooter({ text: tLang.footer, iconURL: LOGO_ICON_URL })
-                                .setTimestamp(new Date((latestMatch.metadata?.game_start || Date.now() / 1000) * 1000));
+                                );
+
+                            const finalImage = (target.show_rank_wheel !== false && rankWheelUrl) ? rankWheelUrl : mapSplash;
+                            if (finalImage) {
+                                embed.setImage(finalImage);
+                            }
+
+                            embed.setFooter({ text: tLang.footer, iconURL: LOGO_ICON_URL })
+                                 .setTimestamp(new Date((latestMatch.metadata?.game_start || Date.now() / 1000) * 1000));
 
                             const actionRow = new ActionRowBuilder().addComponents(
                                 new ButtonBuilder()
@@ -729,7 +737,7 @@ async function checkFollowedPlayers() {
                                 components: [actionRow]
                             });
                         } catch (err) {
-                            console.error(`[RadianiteBot] Erreur envoi vers salon ${target.channel}:`, err.message);
+                            console.error(`[RadianiteBot] Erreur envoi vers salon ${target.channel}:`, err);
                         }
                     }
 
