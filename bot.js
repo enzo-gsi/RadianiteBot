@@ -8,7 +8,7 @@ const {
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
-    ButtonStyle,
+    ButtonStyle, 
     SlashCommandBuilder 
 } = require('discord.js');
 const cron = require('node-cron');
@@ -19,6 +19,7 @@ const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '1436123733197590624';
 const HENRIK_API_KEY = process.env.HENRIK_API_KEY;
 const YOUR_WEBSITE_URL = (process.env.WEBSITE_URL || "https://radianitedb.lol").replace(/\/$/, "");
+const LOGO_ICON_URL = `${YOUR_WEBSITE_URL}/apple-touch-icon.png`;
 
 // Verified official agent display icons & map splashes from valorant-api.com
 const AGENT_ASSETS = {
@@ -39,13 +40,13 @@ const AGENT_ASSETS = {
     'astra': 'https://media.valorant-api.com/agents/41fb69c1-4153-7b72-d944-9a625dc73269/displayicon.png',
     'kay/o': 'https://media.valorant-api.com/agents/601dbbe7-43ce-be57-2a40-4abd24953621/displayicon.png',
     'chamber': 'https://media.valorant-api.com/agents/22697a3d-45bf-8dd7-4fec-84a9e28c69d7/displayicon.png',
-    'neon': 'https://media.valorant-api.com/agents/bb2a4830-492d-a480-d4fb-61d36cca850d/displayicon.png',
-    'fade': 'https://media.valorant-api.com/agents/dad69b49-4378-b19e-ee7e-043ec4ca5255/displayicon.png',
+    'neon': 'https://media.valorant-api.com/agents/bb2a483e-4654-8025-bbe7-56a9394fa50f/displayicon.png',
+    'fade': 'https://media.valorant-api.com/agents/dade69b4-4f5a-8528-247b-219e5a1facd6/displayicon.png',
     'harbor': 'https://media.valorant-api.com/agents/95b78ed7-4637-86d9-7e41-71ba8c293152/displayicon.png',
     'gekko': 'https://media.valorant-api.com/agents/e370fa57-4757-3604-3648-499e1f642d3f/displayicon.png',
-    'deadlock': 'https://media.valorant-api.com/agents/cc8b64c8-4b25-4ff9-6e7f-37b4da43d235/displayicon.png',
+    'deadlock': 'https://media.valorant-api.com/agents/cc8b64d8-4b25-4ff9-6e7f-37b4da43c235/displayicon.png',
     'iso': 'https://media.valorant-api.com/agents/0e38b510-41a8-5780-5e8f-568b2a4f2d6c/displayicon.png',
-    'clove': 'https://media.valorant-api.com/agents/1dbf2edd-4729-0984-3115-daa5eed44993/displayicon.png',
+    'clove': 'https://media.valorant-api.com/agents/1dbf2edd-4729-0984-3115-ffbceddda528/displayicon.png',
     'vyse': 'https://media.valorant-api.com/agents/efba5359-4016-a1e5-7626-b1ae76895940/displayicon.png'
 };
 
@@ -62,6 +63,80 @@ const MAP_SPLASHES = {
     'sunset': 'https://media.valorant-api.com/maps/92584fbe-486a-b1b2-9fac-be630f727a47/splash.png',
     'abyss': 'https://media.valorant-api.com/maps/224b0c95-4d94-b14e-7bf0-388d45ba2e92/splash.png'
 };
+
+// --- Internationalization / Translations Dictionary ---
+const I18N = {
+    en: {
+        player_profile: 'Player Profile',
+        match_report: 'Match Report',
+        region: 'Region',
+        combat_score: 'Score',
+        current_rank: '◈ Rank',
+        kd_ratio: '◈ K/D Ratio',
+        win_rate: '◈ Win Rate',
+        acs_adr: '◈ ACS / ADR',
+        precision: '◈ Headshot %',
+        top_agent: '◈ Top Agent',
+        played_agent: '◈ Agent Played',
+        kda: '◈ K / D / A',
+        mmr_change: '◈ RR Change',
+        matches: 'matches',
+        wins: 'wins',
+        view_full: 'View Full Stats & Matches',
+        open_site: 'Open RadianiteDB',
+        victory: 'VICTORY',
+        defeat: 'DEFEAT',
+        rank_up_title: '★ RANK UP // PROMOTED TO',
+        rank_up_banner: 'Congratulations! Promoted to',
+        updated: 'Updated',
+        footer: 'RadianiteDB • Official Valorant Analytics',
+        match_ended: 'finished a match on',
+        rank_up_msg: 'just RANKED UP to',
+        channel_set: '✓ Notifications channel set to',
+        lang_set: '✓ Bot language set to **English**.',
+        followed_success: '✓ Now tracking',
+        unfollowed_success: '✓ Stopped tracking',
+        no_followed: 'You are not tracking any players yet. Use `/suivre Player#TAG` to add one.',
+        tracking_list: 'Tracked Players List'
+    },
+    fr: {
+        player_profile: 'Profil du Joueur',
+        match_report: 'Rapport de Match',
+        region: 'Région',
+        combat_score: 'Score',
+        current_rank: '◈ Rang Actuel',
+        kd_ratio: '◈ Ratio K/D',
+        win_rate: '◈ Taux de Victoire',
+        acs_adr: '◈ ACS / ADR',
+        precision: '◈ % Tirs Tête',
+        top_agent: '◈ Agent Principal',
+        played_agent: '◈ Agent Joué',
+        kda: '◈ K / D / A',
+        mmr_change: '◈ Évolution RR',
+        matches: 'matchs',
+        wins: 'victoires',
+        view_full: 'Voir les 100+ Matchs & Stats complètes',
+        open_site: 'Ouvrir RadianiteDB',
+        victory: 'VICTOIRE',
+        defeat: 'DÉFAITE',
+        rank_up_title: '★ RANK UP // PROMOTION EN',
+        rank_up_banner: 'Félicitations ! Promotion en',
+        updated: 'Mis à jour',
+        footer: 'RadianiteDB • Statistiques Officielles Valorant',
+        match_ended: 'a terminé sa partie sur',
+        rank_up_msg: 'vient de RANK UP en',
+        channel_set: '✓ Les notifications seront désormais envoyées dans',
+        lang_set: '✓ Langue du bot définie sur **Français**.',
+        followed_success: '✓ Vous suivez maintenant',
+        unfollowed_success: '✓ Vous ne suivez plus',
+        no_followed: 'Vous ne suivez aucun joueur pour le moment. Utilisez `/suivre Pseudo#TAG`.',
+        tracking_list: 'Liste des Joueurs Suivis'
+    }
+};
+
+function getT(lang = 'en') {
+    return I18N[lang] || I18N.en;
+}
 
 const henrikApi = axios.create({
     baseURL: 'https://api.henrikdev.xyz',
@@ -81,51 +156,64 @@ const client = new Client({
     ]
 });
 
-// --- Définition des Commandes Slash V2 ---
+// --- Définition des Commandes Slash ---
 const slashCommands = [
     new SlashCommandBuilder()
-        .setName('setchannel')
-        .setDescription('Définit le salon où recevoir les notifications de fin de partie.')
-        .addChannelOption(opt => 
-            opt.setName('salon')
-               .setDescription('Salon textuel cible (optionnel, par défaut ce salon)')
-               .setRequired(false)
-        ),
-    
-    new SlashCommandBuilder()
-        .setName('suivis')
-        .setDescription('Affiche la liste de tous les joueurs Valorant que vous suivez.'),
-
-    new SlashCommandBuilder()
         .setName('stats')
-        .setDescription('Affiche le dossier tactique et les statistiques d\'un joueur.')
+        .setDescription('Display full Valorant stats and rank for any player.')
         .addStringOption(opt =>
             opt.setName('joueur')
-               .setDescription('Identifiant Riot au format Pseudo#TAG (ex: TenZ#SEN)')
+               .setDescription('Riot ID format: Name#TAG (e.g. TenZ#SEN)')
                .setRequired(true)
         ),
 
     new SlashCommandBuilder()
         .setName('suivre')
-        .setDescription('Ajoute un joueur à votre liste de surveillance automatique.')
+        .setDescription('Track a player and receive live match notifications.')
         .addStringOption(opt =>
             opt.setName('joueur')
-               .setDescription('Identifiant Riot au format Pseudo#TAG (ex: TenZ#SEN)')
+               .setDescription('Riot ID format: Name#TAG (e.g. TenZ#SEN)')
                .setRequired(true)
         ),
 
     new SlashCommandBuilder()
         .setName('neplus-suivre')
-        .setDescription('Retire un joueur de votre liste de surveillance.')
+        .setDescription('Stop tracking a player.')
         .addStringOption(opt =>
             opt.setName('joueur')
-               .setDescription('Identifiant Riot au format Pseudo#TAG à retirer')
+               .setDescription('Riot ID format: Name#TAG')
                .setRequired(true)
         ),
 
     new SlashCommandBuilder()
+        .setName('suivis')
+        .setDescription('View the list of players you are currently tracking.'),
+
+    new SlashCommandBuilder()
+        .setName('setchannel')
+        .setDescription('Set the text channel where the bot sends match alerts.')
+        .addChannelOption(opt => 
+            opt.setName('salon')
+               .setDescription('Target text channel')
+               .setRequired(false)
+        ),
+
+    new SlashCommandBuilder()
+        .setName('language')
+        .setDescription('Set bot language (English / Français).')
+        .addStringOption(opt =>
+            opt.setName('lang')
+               .setDescription('Choose language / Choisissez la langue')
+               .setRequired(true)
+               .addChoices(
+                   { name: 'English', value: 'en' },
+                   { name: 'Français', value: 'fr' }
+               )
+        ),
+
+    new SlashCommandBuilder()
         .setName('aide')
-        .setDescription('Affiche le guide complet et les commandes du bot RadianiteDB.')
+        .setDescription('Show help guide and commands overview.')
 ].map(cmd => cmd.toJSON());
 
 // Enregistrement des commandes Slash
@@ -139,101 +227,124 @@ client.once('ready', async () => {
             Routes.applicationCommands(CLIENT_ID),
             { body: slashCommands },
         );
-        console.log('[RadianiteBot] 6 Commandes Slash enregistrées avec succès.');
+        console.log('[RadianiteBot] Commandes Slash enregistrées avec succès !');
     } catch (error) {
-        console.error('[RadianiteBot] Erreur enregistrement commandes:', error);
+        console.error('[RadianiteBot] Erreur lors de l\'enregistrement des commandes Slash :', error);
     }
+
+    // Cron job de surveillance toutes les 3 minutes
+    cron.schedule('*/3 * * * *', () => {
+        checkFollowedPlayers();
+    });
+    
+    // Première vérification 10s après démarrage
+    setTimeout(checkFollowedPlayers, 10000);
 });
 
-// --- Gestion des Interactions Slash Commands ---
+// --- Traitement des Commandes Slash ---
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName } = interaction;
     const discord_id = interaction.user.id;
 
-    // Helper: récupérer l'utilisateur dans Supabase
     async function getDbUser() {
         return await knex('users').where({ discord_id: String(discord_id) }).first();
     }
 
+    const dbUser = await getDbUser();
+    const userLang = dbUser?.language || 'en';
+    const t = getT(userLang);
+
     // 1. /setchannel
     if (commandName === 'setchannel') {
-        const targetChannel = interaction.options.getChannel('salon') || interaction.channel;
-
+        const channel = interaction.options.getChannel('salon') || interaction.channel;
+        
         try {
-            let user = await getDbUser();
-            if (!user) {
-                const connectButton = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setLabel('Se connecter sur RadianiteDB')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`${YOUR_WEBSITE_URL}/auth/discord`)
-                );
+            await interaction.deferReply({ ephemeral: true });
+            let user = dbUser;
 
-                return await interaction.reply({ 
-                    content: `⚠️ **Compte non lié** : Vous devez d'abord vous connecter avec Discord sur **[${YOUR_WEBSITE_URL}](${YOUR_WEBSITE_URL})** pour activer les notifications automatiques.`,
-                    components: [connectButton],
-                    ephemeral: true 
+            if (!user) {
+                const [inserted] = await knex('users').insert({
+                    discord_id: String(discord_id),
+                    username: interaction.user.tag,
+                    discord_channel_id: String(channel.id)
+                }).returning('*');
+                user = inserted;
+            } else {
+                await knex('users').where({ discord_id: String(discord_id) }).update({
+                    discord_channel_id: String(channel.id)
                 });
             }
 
-            await knex('users').where({ discord_id: String(discord_id) }).update({
-                discord_channel_id: targetChannel.id
+            await interaction.editReply({ 
+                content: `${t.channel_set} <#${channel.id}>.` 
             });
-            
-            const embed = new EmbedBuilder()
-                .setTitle('🎯 SALON DE TRANSMISSION CONFIGURÉ')
-                .setColor(0x00F5D4)
-                .setDescription(`Les alertes de fin de match pour vos joueurs suivis seront désormais envoyées dans <#${targetChannel.id}> !`)
-                .setFooter({ text: 'RadianiteDB Notification Engine • Supabase PostgreSQL' });
-
-            await interaction.reply({ embeds: [embed], ephemeral: true });
         } catch (err) {
             console.error(err);
-            await interaction.reply({ content: '❌ Une erreur est survenue lors de la configuration du salon.', ephemeral: true });
+            await interaction.editReply({ content: '❌ Error saving notification channel.' });
         }
     }
 
-    // 2. /suivis
+    // 2. /language
+    else if (commandName === 'language') {
+        const newLang = interaction.options.getString('lang') === 'fr' ? 'fr' : 'en';
+        try {
+            await interaction.deferReply({ ephemeral: true });
+            let user = dbUser;
+            if (!user) {
+                await knex('users').insert({
+                    discord_id: String(discord_id),
+                    username: interaction.user.tag,
+                    language: newLang
+                });
+            } else {
+                await knex('users').where({ discord_id: String(discord_id) }).update({
+                    language: newLang
+                });
+            }
+            const newT = getT(newLang);
+            await interaction.editReply({ content: newT.lang_set });
+        } catch (err) {
+            console.error(err);
+            await interaction.editReply({ content: '❌ Error updating language setting.' });
+        }
+    }
+
+    // 3. /suivis
     else if (commandName === 'suivis') {
         try {
             await interaction.deferReply({ ephemeral: true });
-            const user = await getDbUser();
+            let user = dbUser;
 
             if (!user) {
-                return await interaction.editReply({ 
-                    content: `⚠️ Vous n'avez pas encore de compte lié sur **[${YOUR_WEBSITE_URL}](${YOUR_WEBSITE_URL})**.` 
-                });
+                return await interaction.editReply({ content: t.no_followed });
             }
 
-            const followed = await knex('followed_players').where({ user_id: user.id }).select();
+            const followed = await knex('followed_players')
+                .where({ user_id: user.id })
+                .select('riot_id');
 
-            if (!followed || followed.length === 0) {
-                const embed = new EmbedBuilder()
-                    .setTitle('📋 JOUEURS SUIVIS // AUCUN JOUEUR')
-                    .setColor(0xFF4655)
-                    .setDescription(`Vous ne suivez aucun joueur pour le moment.\n\n👉 Utilisez la commande \`/suivre [Pseudo#TAG]\` ou cliquez sur **Follow** sur le site pour recevoir des notifications en direct !`)
-                    .setFooter({ text: 'RadianiteDB Tracking Hub' });
-
-                return await interaction.editReply({ embeds: [embed] });
+            if (followed.length === 0) {
+                return await interaction.editReply({ content: t.no_followed });
             }
 
-            const channelMention = user.discord_channel_id ? `<#${user.discord_channel_id}>` : '*Non configuré (utilisez `/setchannel`)*';
-            const listFormatted = followed.map((f, i) => `**${i + 1}.** \`${f.riot_id}\` • [Voir le profil](${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(f.riot_id)})`).join('\n');
+            const playerListStr = followed.map((p, i) => `**${i + 1}.** [${p.riot_id}](${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(p.riot_id)})`).join('\n');
 
             const embed = new EmbedBuilder()
-                .setTitle(`📋 VOS JOUEURS SUIVIS (${followed.length})`)
+                .setAuthor({ 
+                    name: `RadianiteDB • ${t.tracking_list}`, 
+                    iconURL: LOGO_ICON_URL
+                })
+                .setTitle(`${followed.length} Player(s) Tracked`)
                 .setColor(0x00F5D4)
-                .setDescription(listFormatted)
-                .addFields(
-                    { name: '📡 Salon de notification actuel', value: channelMention, inline: false }
-                )
-                .setFooter({ text: 'RadianiteDB Tracking Hub • Notifications automatiques toutes les 5 min' });
+                .setDescription(playerListStr)
+                .setFooter({ text: t.footer, iconURL: LOGO_ICON_URL })
+                .setTimestamp();
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setLabel('Ouvrir RadianiteDB')
+                    .setLabel(t.open_site)
                     .setStyle(ButtonStyle.Link)
                     .setURL(YOUR_WEBSITE_URL)
             );
@@ -241,15 +352,15 @@ client.on('interactionCreate', async interaction => {
             await interaction.editReply({ embeds: [embed], components: [row] });
         } catch (err) {
             console.error(err);
-            await interaction.editReply({ content: '❌ Erreur lors de la récupération des joueurs suivis.' });
+            await interaction.editReply({ content: '❌ Error fetching tracked players list.' });
         }
     }
 
-    // 3. /stats
+    // 4. /stats
     else if (commandName === 'stats') {
         const rawInput = interaction.options.getString('joueur');
         if (!rawInput.includes('#')) {
-            return await interaction.reply({ content: '❌ Format invalide. Veuillez préciser le Tag Riot (ex: `TenZ#SEN`).', ephemeral: true });
+            return await interaction.reply({ content: '❌ Invalid format. Please include Riot Tag (e.g. `TenZ#SEN`).', ephemeral: true });
         }
 
         const [name, tag] = rawInput.trim().split('#');
@@ -274,44 +385,45 @@ client.on('interactionCreate', async interaction => {
             const score = overview.statsScore || 0;
 
             const bestAgent = overview.bestAgent || data.analysis?.agents?.best?.name || 'Agent';
-            const agentKey = bestAgent.toLowerCase();
             const tierNum = (rInfo.tier !== undefined && rInfo.tier !== null) ? rInfo.tier : 18;
             const rrNum = rInfo.rr || 0;
             const lastChangeNum = rInfo.lastRRChange || 0;
+
+            // Large Rank Wheel Graphic with cache-buster
             const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=360&v=3&t=${Date.now()}`;
+            
+            // Equipped In-Game Player Card Banner / Thumbnail
+            const playerCardThumbnail = pInfo.cardSmall || pInfo.avatarUrl || pInfo.cardLarge || LOGO_ICON_URL;
 
             const embed = new EmbedBuilder()
                 .setAuthor({
-                    name: `RADIANITEDB // DOSSIER JOUEUR TACTIQUE`,
-                    iconURL: 'https://cdn.discordapp.com/emojis/849999088656678912.png'
+                    name: `RadianiteDB • ${t.player_profile}`,
+                    iconURL: LOGO_ICON_URL
                 })
                 .setTitle(`${pInfo.name || rawInput} • LVL ${pInfo.level || 1}`)
                 .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(rawInput)}`)
                 .setColor(score >= 600 ? 0x00F5D4 : 0xFF4655)
-                .setThumbnail(rankWheelUrl)
-                .setDescription(`Région: **${pInfo.region || 'EU'}** • Score Combat: **${score} / 1000** ⚡\n> *Données officielles synchronisées avec Supabase Cloud*`)
+                .setThumbnail(playerCardThumbnail)
+                .setDescription(`${t.region}: **${pInfo.region || 'EU'}** • ${t.combat_score}: **${score} / 1000** ⚡`)
                 .addFields(
-                    { name: '◈ Rang Actuel', value: `**${rankName}**\n(${rr} RR)`, inline: true },
-                    { name: '◈ Combat K/D', value: `**${kd} K/D**\n(${overview.gameCount || 0} matchs)`, inline: true },
-                    { name: '◈ Taux de Victoire', value: `**${winRate}% Winrate**\n(${Math.round((winRate/100) * (overview.gameCount || 0))} V)`, inline: true },
-                    { name: '◈ ACS / ADR', value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
-                    { name: '◈ Précision Tirs', value: `**${hs}% Headshot**\nTirs tête`, inline: true },
-                    { name: '◈ Spécialité Agent', value: `**${bestAgent}**\nAgent dominant`, inline: true }
+                    { name: t.current_rank, value: `**${rankName}**\n(${rr} RR)`, inline: true },
+                    { name: t.kd_ratio, value: `**${kd} K/D**\n(${overview.gameCount || 0} ${t.matches})`, inline: true },
+                    { name: t.win_rate, value: `**${winRate}%**\n(${Math.round((winRate/100) * (overview.gameCount || 0))} ${t.wins})`, inline: true },
+                    { name: t.acs_adr, value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
+                    { name: t.precision, value: `**${hs}% HS**`, inline: true },
+                    { name: t.top_agent, value: `**${bestAgent}**`, inline: true }
                 )
-                .setFooter({ text: 'RadianiteDB Live Analytics • Données officielles Valorant' })
+                .setImage(rankWheelUrl)
+                .setFooter({ text: t.footer, iconURL: LOGO_ICON_URL })
                 .setTimestamp();
-
-            if (pInfo.bestAgentSplash || pInfo.bestMapSplash) {
-                embed.setImage(pInfo.bestAgentSplash || pInfo.bestMapSplash);
-            }
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setLabel('Voir les 100+ Matchs & Stats complètes')
+                    .setLabel(t.view_full)
                     .setStyle(ButtonStyle.Link)
                     .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(rawInput)}`),
                 new ButtonBuilder()
-                    .setLabel('Ouvrir RadianiteDB')
+                    .setLabel(t.open_site)
                     .setStyle(ButtonStyle.Link)
                     .setURL(YOUR_WEBSITE_URL)
             );
@@ -319,104 +431,96 @@ client.on('interactionCreate', async interaction => {
             await interaction.editReply({ embeds: [embed], components: [row] });
         } catch (err) {
             console.error(err);
-            await interaction.editReply({ content: `❌ Impossible de récupérer les statistiques pour **${rawInput}**. Vérifiez l'orthographe du pseudo et du tag.` });
+            await interaction.editReply({ content: `❌ Unable to fetch statistics for **${rawInput}**. Please verify spelling and Riot tag.` });
         }
     }
 
-    // 4. /suivre
+    // 5. /suivre
     else if (commandName === 'suivre') {
         const rawInput = interaction.options.getString('joueur');
         if (!rawInput.includes('#')) {
-            return await interaction.reply({ content: '❌ Format invalide. Exemple: `/suivre TenZ#SEN`', ephemeral: true });
+            return await interaction.reply({ content: '❌ Invalid format. Example: `/suivre TenZ#SEN`', ephemeral: true });
         }
 
         try {
             await interaction.deferReply({ ephemeral: true });
-            let user = await getDbUser();
+            let user = dbUser;
 
             if (!user) {
                 const [inserted] = await knex('users').insert({
                     discord_id: String(discord_id),
                     username: interaction.user.tag,
-                    avatar: interaction.user.displayAvatarURL()
+                    discord_channel_id: String(interaction.channelId)
+                }).returning('*');
+                user = inserted;
+            }
+
+            const existing = await knex('followed_players')
+                .where({ user_id: user.id, riot_id: rawInput.trim() })
+                .first();
+
+            if (!existing) {
+                await knex('followed_players').insert({
+                    user_id: user.id,
+                    riot_id: rawInput.trim()
                 });
-                user = await getDbUser();
             }
 
-            const cleanId = rawInput.trim();
-            const existing = await knex('followed_players').where({
-                user_id: user.id,
-                riot_id: cleanId
-            }).first();
-
-            if (existing) {
-                return await interaction.editReply({ content: `ℹ️ Vous suivez déjà **${cleanId}**.` });
-            }
-
-            await knex('followed_players').insert({
-                user_id: user.id,
-                riot_id: cleanId
+            await interaction.editReply({ 
+                content: `${t.followed_success} **${rawInput.trim()}** !` 
             });
-
-            const embed = new EmbedBuilder()
-                .setTitle('✅ JOUEUR AJOUTÉ À LA SURVEILLANCE')
-                .setColor(0x00F5D4)
-                .setDescription(`Vous suivez désormais **${cleanId}** !\nDès qu'une nouvelle partie compétitive se termine, vous recevrez une alerte complète ici.`)
-                .setFooter({ text: 'RadianiteDB Notification Engine' });
-
-            await interaction.editReply({ embeds: [embed] });
         } catch (err) {
             console.error(err);
-            await interaction.editReply({ content: '❌ Erreur lors de l\'ajout du joueur.' });
+            await interaction.editReply({ content: '❌ Error adding player to tracking list.' });
         }
     }
 
-    // 5. /neplus-suivre
+    // 6. /neplus-suivre
     else if (commandName === 'neplus-suivre') {
-        const rawInput = interaction.options.getString('joueur').trim();
-
+        const rawInput = interaction.options.getString('joueur');
         try {
             await interaction.deferReply({ ephemeral: true });
-            const user = await getDbUser();
-            if (!user) {
-                return await interaction.editReply({ content: '⚠️ Aucun compte lié trouvé.' });
+            let user = dbUser;
+
+            if (user) {
+                await knex('followed_players')
+                    .where({ user_id: user.id, riot_id: rawInput.trim() })
+                    .del();
             }
 
-            const deleted = await knex('followed_players').where({
-                user_id: user.id,
-                riot_id: rawInput
-            }).del();
-
-            if (deleted > 0) {
-                await interaction.editReply({ content: `✅ Vous ne suivez plus **${rawInput}**.` });
-            } else {
-                await interaction.editReply({ content: `ℹ️ Vous ne suiviez pas **${rawInput}**.` });
-            }
+            await interaction.editReply({ 
+                content: `${t.unfollowed_success} **${rawInput.trim()}**.` 
+            });
         } catch (err) {
             console.error(err);
-            await interaction.editReply({ content: '❌ Erreur lors de la suppression.' });
+            await interaction.editReply({ content: '❌ Error removing player.' });
         }
     }
 
-    // 6. /aide
+    // 7. /aide
     else if (commandName === 'aide') {
         const embed = new EmbedBuilder()
-            .setTitle('📖 RADIANITEDB // GUIDE DU BOT & COMMANDES')
+            .setAuthor({ 
+                name: `RadianiteDB • Help & Commands`, 
+                iconURL: LOGO_ICON_URL 
+            })
+            .setTitle('Bot Overview & Quick Start')
             .setColor(0x00F5D4)
-            .setDescription(`**RadianiteBot** surveille en direct les parties Valorant de vos joueurs favoris et vous alerte dès qu'un match se termine !`)
+            .setDescription(`**RadianiteBot** automatically tracks matches, displays live rank progression with dynamic RR wheel graphics, and sends match reports to your Discord server.\n\nWebsite: **[${YOUR_WEBSITE_URL}](${YOUR_WEBSITE_URL})**`)
             .addFields(
-                { name: '`/setchannel [salon]`', value: 'Définit le salon Discord où recevoir les alertes de fin de partie.' },
-                { name: '`/suivre [Pseudo#TAG]`', value: 'Ajoute un joueur Valorant à votre liste de surveillance.' },
-                { name: '`/neplus-suivre [Pseudo#TAG]`', value: 'Retire un joueur de vos notifications.' },
-                { name: '`/suivis`', value: 'Affiche tous les joueurs que vous suivez actuellement.' },
-                { name: '`/stats [Pseudo#TAG]`', value: 'Affiche instantanément la fiche de stats, K/D, rang et MMR d\'un joueur.' },
-                { name: '🌐 Site Web', value: `Consultez l'historique infini et comparez vos duels sur **[${YOUR_WEBSITE_URL}](${YOUR_WEBSITE_URL})**.` }
+                { name: '📊 `/stats <Player#TAG>`', value: 'Inspect full statistics, K/D, winrate, and high-res dynamic rank wheel.' },
+                { name: '🔔 `/suivre <Player#TAG>`', value: 'Add player to automatic live match tracking notifications.' },
+                { name: '🔕 `/neplus-suivre <Player#TAG>`', value: 'Stop tracking a player.' },
+                { name: '📋 `/suivis`', value: 'View all players currently in your tracking list.' },
+                { name: '📺 `/setchannel [channel]`', value: 'Set the target text channel for match alerts.' },
+                { name: '🌐 `/language <en|fr>`', value: 'Set your preferred bot language (English / Français).' }
             )
-            .setFooter({ text: 'RadianiteDB • Powered by Supabase PostgreSQL' });
+            .setFooter({ text: t.footer, iconURL: LOGO_ICON_URL })
+            .setTimestamp();
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel('Accéder au site RadianiteDB')
+                .setLabel(t.open_site)
                 .setStyle(ButtonStyle.Link)
                 .setURL(YOUR_WEBSITE_URL)
         );
@@ -425,100 +529,97 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// --- MOTEUR DE SURVEILLANCE AUTOMATIQUE DES MATCHS ---
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
+// --- Moteur de Surveillance des Matchs Suivis ---
 async function checkFollowedPlayers() {
-    console.log('[RadianiteBot] Analyse des nouveaux matchs en cours...');
-    
     try {
-        const subscriptions = await knex('followed_players')
+        const followedList = await knex('followed_players')
             .join('users', 'users.id', 'followed_players.user_id')
             .whereNotNull('users.discord_channel_id')
             .select(
                 'followed_players.riot_id', 
                 'users.discord_channel_id', 
-                'users.discord_id',
-                'users.notify_mentions',
-                'users.notify_rankup_only',
-                'users.show_rank_wheel'
+                'users.discord_id', 
+                'users.notify_mentions', 
+                'users.notify_rankup_only', 
+                'users.show_rank_wheel',
+                'users.language'
             );
 
-        if (subscriptions.length === 0) {
-            return;
-        }
+        if (!followedList || followedList.length === 0) return;
 
         // Regrouper par joueur
-        const playersToWatch = new Map();
-        for (const sub of subscriptions) {
-            if (!playersToWatch.has(sub.riot_id)) {
-                playersToWatch.set(sub.riot_id, []);
+        const playersMap = {};
+        for (const item of followedList) {
+            if (!playersMap[item.riot_id]) {
+                playersMap[item.riot_id] = [];
             }
-            playersToWatch.get(sub.riot_id).push({ 
-                channel: sub.discord_channel_id, 
-                user: sub.discord_id,
-                notify_mentions: sub.notify_mentions !== false,
-                notify_rankup_only: !!sub.notify_rankup_only,
-                show_rank_wheel: sub.show_rank_wheel !== false
+            playersMap[item.riot_id].push({
+                channel: item.discord_channel_id,
+                user: item.discord_id,
+                notify_mentions: item.notify_mentions !== false,
+                notify_rankup_only: !!item.notify_rankup_only,
+                show_rank_wheel: item.show_rank_wheel !== false,
+                language: item.language || 'en'
             });
         }
 
-        // Vérifier chaque joueur
-        for (const [riotId, targets] of playersToWatch.entries()) {
+        for (const [riotId, targets] of Object.entries(playersMap)) {
+            if (!riotId.includes('#')) continue;
+            const [name, tag] = riotId.split('#');
+
             try {
-                const [name, tag] = riotId.split('#');
-                if (!name || !tag) continue;
-
-                // Récupérer le match le plus récent
-                const matchRes = await henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=3`);
-                const matches = matchRes.data?.data || [];
-                if (matches.length === 0) continue;
+                // 1. Récupérer le dernier match via Henrik API
+                const matchRes = await henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=1`);
                 
-                const latestMatch = matches[0];
-                const latestMatchId = latestMatch.metadata?.matchid;
-                if (!latestMatchId) continue;
+                if (matchRes.data && matchRes.data.data && matchRes.data.data.length > 0) {
+                    const latestMatch = matchRes.data.data[0];
+                    const latestMatchId = latestMatch.metadata?.matchid;
 
-                const memory = await knex('bot_memory').where({ riot_id: riotId }).first();
-                const lastAnnouncedId = memory ? memory.last_match_id : null;
+                    if (!latestMatchId) continue;
 
-                if (latestMatchId !== lastAnnouncedId) {
-                    console.log(`[RadianiteBot] 🚨 Nouveau match détecté pour ${riotId}: ${latestMatchId}`);
-                    
-                    const playerObj = latestMatch.players?.all_players?.find(p => p.name.toLowerCase() === name.toLowerCase());
-                    if (!playerObj || !playerObj.stats) continue;
+                    // 2. Vérifier si ce match a déjà été notifié
+                    const memory = await knex('bot_memory').where({ riot_id: riotId }).first();
 
-                    const playerTeam = (playerObj.team || 'red').toLowerCase();
-                    const teamData = latestMatch.teams?.[playerTeam] || { has_won: false, rounds_won: 0, rounds_lost: 0 };
-                    const isWin = teamData.has_won;
+                    if (memory && memory.last_match_id === latestMatchId) {
+                        continue; // Déjà traité
+                    }
 
-                    const kills = playerObj.stats.kills || 0;
-                    const deaths = playerObj.stats.deaths || 0;
-                    const assists = playerObj.stats.assists || 0;
-                    const deathsForKd = deaths > 0 ? deaths : 1;
-                    const kd = (kills / deathsForKd).toFixed(2);
-                    const roundsPlayed = latestMatch.metadata?.rounds_played || (teamData.rounds_won + teamData.rounds_lost) || 1;
-                    const acs = Math.round((playerObj.stats.score || 0) / roundsPlayed);
-                    const damageMade = playerObj.damage_made || 0;
-                    const adr = Math.round(damageMade / roundsPlayed);
-                    
-                    const headshots = playerObj.stats.headshots || 0;
-                    const totalShots = (playerObj.stats.headshots || 0) + (playerObj.stats.bodyshots || 0) + (playerObj.stats.legshots || 0);
-                    const hsPercent = totalShots > 0 ? Math.round((headshots / totalShots) * 100) : 0;
+                    // 3. Parser les statistiques du match
+                    const playerObj = latestMatch.players?.all_players?.find(
+                        p => p.name?.toLowerCase() === name.toLowerCase() && p.tag?.toLowerCase() === tag.toLowerCase()
+                    );
+
+                    if (!playerObj) continue;
 
                     const agentName = playerObj.character || 'Agent';
                     const agentKey = agentName.toLowerCase();
-                    const agentIcon = AGENT_ASSETS[agentKey] || playerObj.assets?.agent?.small || 'https://media.valorant-api.com/agents/add6443a-41bd-e414-f6ad-e58d267f4e95/displayicon.png';
+                    const agentIcon = AGENT_ASSETS[agentKey] || playerObj.assets?.agent?.small || null;
+                    const mapName = latestMatch.metadata?.map || 'Map';
+                    const mapSplash = MAP_SPLASHES[mapName.toLowerCase()] || null;
 
-                    const mapName = latestMatch.metadata?.map || 'Ascent';
-                    const mapKey = mapName.toLowerCase();
-                    const mapSplash = MAP_SPLASHES[mapKey] || null;
+                    const stats = playerObj.stats || {};
+                    const kills = stats.kills || 0;
+                    const deaths = stats.deaths || 0;
+                    const assists = stats.assists || 0;
+                    const kd = (deaths > 0 ? (kills / deaths) : kills).toFixed(2);
+                    const roundsPlayed = latestMatch.metadata?.rounds_played || 1;
+                    const acs = Math.round((stats.score || 0) / roundsPlayed);
+                    const adr = Math.round((playerObj.damage_made || 0) / roundsPlayed);
+                    
+                    const headshots = stats.headshots || 0;
+                    const totalShots = headshots + (stats.bodyshots || 0) + (stats.legshots || 0);
+                    const hsPercent = totalShots > 0 ? Math.round((headshots / totalShots) * 100) : 0;
+
+                    const playerTeam = playerObj.team?.toLowerCase();
+                    const teamData = latestMatch.teams?.[playerTeam] || { rounds_won: 0, rounds_lost: 0, has_won: false };
+                    const isWin = teamData.has_won;
 
                     // Récupérer le changement de RR si disponible
                     let rrChangeStr = null;
                     let rrChangeNum = 0;
                     let currentRRNum = 50;
                     let currentTierNum = playerObj.currenttier || 18;
-                    let currentRankStr = playerObj.currenttier_patched || 'Classé';
+                    let currentRankStr = playerObj.currenttier_patched || 'Ranked';
                     let isRankup = false;
 
                     try {
@@ -531,7 +632,6 @@ async function checkFollowedPlayers() {
                             if (ch !== null && ch !== undefined && ch !== 0) {
                                 rrChangeNum = ch;
                                 rrChangeStr = ch > 0 ? `+${ch} RR` : `${ch} RR`;
-                                // Detection de promotion (Rankup)
                                 if (ch > 0 && currentRRNum < ch) {
                                     isRankup = true;
                                 }
@@ -539,82 +639,74 @@ async function checkFollowedPlayers() {
                         }
                     } catch (e) {}
 
-                    // Construction de la Roue de Rang Dynamique (Gain Vert / Perte Rouge / Rankup Or)
+                    // Large Rank Wheel URL
                     const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&rankup=${isRankup ? 1 : 0}&size=360&v=3&t=${Date.now()}`;
-
-                    // Construction du somptueux Embed tactique
-                    const embedColor = isRankup ? 0xFFE853 : (isWin ? 0x00F5D4 : 0xFF4655);
-                    let resultTitle = isWin 
-                        ? `VICTOIRE // ${teamData.rounds_won} - ${teamData.rounds_lost}` 
-                        : `DÉFAITE // ${teamData.rounds_won} - ${teamData.rounds_lost}`;
-
-                    if (isRankup) {
-                        resultTitle = `★ RANK UP // PROMOTION EN ${currentRankStr.toUpperCase()}`;
-                    }
-
-                    const embed = new EmbedBuilder()
-                        .setAuthor({ 
-                            name: `RADIANITEDB // RAPPORT DE MATCH EN DIRECT`, 
-                            iconURL: 'https://cdn.discordapp.com/emojis/849999088656678912.png'
-                        })
-                        .setTitle(`${resultTitle} • ${mapName.toUpperCase()}`)
-                        .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
-                        .setColor(embedColor)
-                        .setDescription(`Dossier tactique de fin de partie pour **${riotId}** (${(latestMatch.metadata?.mode || 'Competitive').toUpperCase()})\n${isRankup ? `> 👑 **Félicitations ! Le joueur est monté ${currentRankStr} (${currentRRNum} RR)**` : ''}`)
-                        .setThumbnail(rankWheelUrl)
-                        .addFields(
-                            { name: '◈ Agent Joué', value: `**${agentName}**`, inline: true },
-                            { name: '◈ Combat K / D / A', value: `**${kills} / ${deaths} / ${assists}**\n(${kd} K/D)`, inline: true },
-                            { name: '◈ Score (ACS / ADR)', value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
-                            { name: '◈ Précision Tirs', value: `**${hsPercent}% Headshot**\n(${headshots} têtes)`, inline: true },
-                            { name: '◈ Rang Actuel', value: `**${currentRankStr}**\n(${currentRRNum} RR)`, inline: true },
-                            { name: '◈ Évolution MMR', value: rrChangeStr ? `**${isRankup ? '★ ' : ''}${rrChangeStr}**` : `*Mis à jour*`, inline: true }
-                        )
-                        .setFooter({ text: `RadianiteDB Auto-Tracking • Supabase Cloud PostgreSQL` })
-                        .setTimestamp(new Date((latestMatch.metadata?.game_start || Date.now() / 1000) * 1000));
-
-                    if (mapSplash) {
-                        embed.setImage(mapSplash);
-                    }
-
-                    const actionRow = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder()
-                            .setLabel('Consulter le dossier complet sur RadianiteDB')
-                            .setStyle(ButtonStyle.Link)
-                            .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
-                    );
 
                     // Envoyer aux salons des utilisateurs selon leurs préférences
                     for (const target of targets) {
                         try {
                             if (target.notify_rankup_only && !isRankup) {
-                                continue; // L'utilisateur ne souhaite que les alertes de promotion (Rank Up)
+                                continue; 
                             }
 
+                            const tLang = getT(target.language || 'en');
                             const channel = await client.channels.fetch(target.channel);
-                            if (channel) {
-                                const userEmbed = EmbedBuilder.from(embed);
-                                if (target.show_rank_wheel === false) {
-                                    userEmbed.setThumbnail(agentIcon);
-                                }
+                            if (!channel) continue;
 
-                                const mentionStr = target.notify_mentions ? `<@${target.user}>, ` : '';
-                                const notificationText = isRankup 
-                                    ? `🎉 ${mentionStr}**${riotId}** vient de **RANK UP** en **${currentRankStr}** !`
-                                    : `🔔 ${mentionStr}**${riotId}** a terminé sa partie sur **${mapName}** !`;
+                            const embedColor = isRankup ? 0xFFE853 : (isWin ? 0x00F5D4 : 0xFF4655);
+                            let resultTitle = isWin 
+                                ? `${tLang.victory} // ${teamData.rounds_won} - ${teamData.rounds_lost}` 
+                                : `${tLang.defeat} // ${teamData.rounds_won} - ${teamData.rounds_lost}`;
 
-                                await channel.send({ 
-                                    content: notificationText, 
-                                    embeds: [userEmbed],
-                                    components: [actionRow]
-                                });
+                            if (isRankup) {
+                                resultTitle = `${tLang.rank_up_title} ${currentRankStr.toUpperCase()}`;
                             }
+
+                            const embed = new EmbedBuilder()
+                                .setAuthor({ 
+                                    name: `RadianiteDB • ${tLang.match_report}`, 
+                                    iconURL: LOGO_ICON_URL
+                                })
+                                .setTitle(`${resultTitle} • ${mapName.toUpperCase()}`)
+                                .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
+                                .setColor(embedColor)
+                                .setDescription(`${isRankup ? `> 👑 **${tLang.rank_up_banner} ${currentRankStr} (${currentRRNum} RR)**\n` : ''}`)
+                                .setThumbnail(agentIcon || LOGO_ICON_URL)
+                                .addFields(
+                                    { name: tLang.played_agent, value: `**${agentName}**`, inline: true },
+                                    { name: tLang.kda, value: `**${kills} / ${deaths} / ${assists}**\n(${kd} K/D)`, inline: true },
+                                    { name: tLang.acs_adr, value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
+                                    { name: tLang.precision, value: `**${hsPercent}% HS**\n(${headshots} heads)`, inline: true },
+                                    { name: tLang.current_rank, value: `**${currentRankStr}**\n(${currentRRNum} RR)`, inline: true },
+                                    { name: tLang.mmr_change, value: rrChangeStr ? `**${isRankup ? '★ ' : ''}${rrChangeStr}**` : `*${tLang.updated}*`, inline: true }
+                                )
+                                .setImage(target.show_rank_wheel !== false ? rankWheelUrl : mapSplash)
+                                .setFooter({ text: tLang.footer, iconURL: LOGO_ICON_URL })
+                                .setTimestamp(new Date((latestMatch.metadata?.game_start || Date.now() / 1000) * 1000));
+
+                            const actionRow = new ActionRowBuilder().addComponents(
+                                new ButtonBuilder()
+                                    .setLabel(tLang.view_full)
+                                    .setStyle(ButtonStyle.Link)
+                                    .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
+                            );
+
+                            const mentionStr = target.notify_mentions ? `<@${target.user}>, ` : '';
+                            const notificationText = isRankup 
+                                ? `🎉 ${mentionStr}**${riotId}** ${tLang.rank_up_msg} **${currentRankStr}** !`
+                                : `🔔 ${mentionStr}**${riotId}** ${tLang.match_ended} **${mapName}** !`;
+
+                            await channel.send({ 
+                                content: notificationText, 
+                                embeds: [embed],
+                                components: [actionRow]
+                            });
                         } catch (err) {
                             console.error(`[RadianiteBot] Erreur envoi vers salon ${target.channel}:`, err.message);
                         }
                     }
 
-                    // Enregistrer en mémoire Supabase
+                    // Enregistrer en mémoire
                     if (memory) {
                         await knex('bot_memory').where({ riot_id: riotId }).update({ last_match_id: latestMatchId });
                     } else {
@@ -629,21 +721,21 @@ async function checkFollowedPlayers() {
                     console.error(`[RadianiteBot] Erreur analyse pour ${riotId}:`, err.message);
                 }
             }
-            
-            await sleep(4000);
         }
-    } catch (globalErr) {
-        console.error("[RadianiteBot] Erreur globale de surveillance:", globalErr.message);
+    } catch (error) {
+        console.error('[RadianiteBot] Erreur générale lors de la vérification :', error);
     }
 }
 
-// Planification automatique toutes les 5 minutes
-cron.schedule('*/5 * * * *', checkFollowedPlayers);
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-if (!BOT_TOKEN) {
-    console.error("ERREUR CRITIQUE: DISCORD_BOT_TOKEN est manquant dans votre fichier .env !");
-} else {
+// Lancement du Bot
+if (BOT_TOKEN) {
     client.login(BOT_TOKEN).catch(err => {
-        console.error("Erreur de connexion du bot Discord:", err.message);
+        console.error('[RadianiteBot] Erreur critique de connexion Discord :', err.message);
     });
+} else {
+    console.warn('[RadianiteBot] DISCORD_BOT_TOKEN manquant dans le fichier .env.');
 }
