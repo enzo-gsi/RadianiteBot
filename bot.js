@@ -831,11 +831,10 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // 7. /scout Command (Live Match Intelligence & Lobby Scouting)
+    // 7. /scout Command (Live Match Intelligence & 10-Player Lobby Radar)
     if (commandName === 'scout') {
         await interaction.deferReply({ ephemeral: false });
 
-        let targetRiotId = interaction.options.getString('joueur');
         const dbUser = await knex('users').where({ discord_id: interaction.user.id }).first();
         let userSession = null;
 
@@ -843,188 +842,146 @@ client.on('interactionCreate', async interaction => {
             userSession = decryptData(dbUser.riot_auth);
         }
 
-        // Check if the caller or target has a linked session to query Riot CoreGame / Pregame
-        if (userSession?.accessToken && userSession?.puuid) {
-            try {
-                const shard = userSession.shard || 'eu';
-                const region = shard === 'eu' ? 'eu-1' : shard === 'na' ? 'na-1' : shard === 'kr' ? 'kr-1' : 'ap-1';
-                const riotHeaders = {
-                    'Authorization': `Bearer ${userSession.accessToken}`,
-                    'X-Riot-Entitlements-JWT': userSession.entitlementsToken,
-                    'X-Riot-ClientPlatform': 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9',
-                    'X-Riot-ClientVersion': cachedRiotVersion,
-                    'User-Agent': 'ShooterGame/14 Windows/10.0.19042.1.256.64bit'
-                };
-
-                // A. Check Core-Game (In-Match)
-                let liveMatchData = null;
-                let isPregame = false;
-
-                try {
-                    const corePlayerRes = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/core-game/v1/players/${userSession.puuid}`, { headers: riotHeaders });
-                    if (corePlayerRes.data?.MatchID) {
-                        const matchDetails = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/core-game/v1/matches/${corePlayerRes.data.MatchID}`, { headers: riotHeaders });
-                        liveMatchData = matchDetails.data;
-                    }
-                } catch (cErr) {}
-
-                // B. Check Pre-Game (Agent Select) if not in core-game
-                if (!liveMatchData) {
-                    try {
-                        const prePlayerRes = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/pregame/v1/players/${userSession.puuid}`, { headers: riotHeaders });
-                        if (prePlayerRes.data?.MatchID) {
-                            const matchDetails = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/pregame/v1/matches/${prePlayerRes.data.MatchID}`, { headers: riotHeaders });
-                            liveMatchData = matchDetails.data;
-                            isPregame = true;
-                        }
-                    } catch (pErr) {}
-                }
-
-                // If a live match is currently active for this user!
-                if (liveMatchData && liveMatchData.Players?.length > 0) {
-                    const myPlayer = liveMatchData.Players.find(p => p.Subject === userSession.puuid);
-                    const myTeamId = myPlayer?.TeamID || 'Blue';
-                    
-                    const allyTeam = [];
-                    const enemyTeam = [];
-
-                    for (const p of liveMatchData.Players) {
-                        let pName = 'Inconnu';
-                        let pTag = '';
-                        let pTier = 'Non-classé';
-                        let pPeak = 'Inconnu';
-                        let pRR = 0;
-
-                        try {
-                            const mmrRes = await henrikApi.get(`/valorant/v2/by-puuid/mmr/${shard}/${p.Subject}`).catch(() => null);
-                            if (mmrRes?.data?.data) {
-                                const d = mmrRes.data.data;
-                                pName = d.name || 'Joueur';
-                                pTag = d.tag || '';
-                                pTier = d.current_data?.currenttierpatched || 'Non-classé';
-                                pRR = d.current_data?.ranking_in_tier || 0;
-                                pPeak = d.highest_rank?.patched_tier || 'Inconnu';
-                            }
-                        } catch (hErr) {}
-
-                        const playerInfo = {
-                            puuid: p.Subject,
-                            riotId: pTag ? `${pName}#${pTag}` : pName,
-                            tier: pTier,
-                            peak: pPeak,
-                            rr: pRR,
-                            isSelf: p.Subject === userSession.puuid
-                        };
-
-                        if (p.TeamID === myTeamId) {
-                            allyTeam.push(playerInfo);
-                        } else {
-                            enemyTeam.push(playerInfo);
-                        }
-                        await sleep(250);
-                    }
-
-                    const liveEmbed = new EmbedBuilder()
-                        .setTitle(`🔴 SCOUTING EN DIRECT • LOBBY ACTIF (${isPregame ? 'Sélection des Agents' : 'En Match'})`)
-                        .setColor(0x00f5d4)
-                        .setDescription(
-                            `🎮 **Mode :** ${liveMatchData.ModeID ? path.basename(liveMatchData.ModeID) : 'Compétitif'}\n` +
-                            `🗺️ **Map ID :** ${liveMatchData.MapID ? path.basename(liveMatchData.MapID) : 'Actuelle'}\n` +
-                            `────────────────────────────────────────\n` +
-                            `🔵 **ÉQUIPE ALLIÉE (${allyTeam.length} joueurs) :**\n` +
-                            allyTeam.map((p, idx) => `**${idx + 1}.** ${p.isSelf ? `👉 **${p.riotId}** (Vous)` : `**${p.riotId}**`} — ${p.tier} (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
-                            `\n\n────────────────────────────────────────\n` +
-                            `🔴 **ÉQUIPE ADVERSE (${enemyTeam.length} joueurs) :**\n` +
-                            enemyTeam.map((p, idx) => `**${idx + 1}.** **${p.riotId}** — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
-                            `\n────────────────────────────────────────`
-                        )
-                        .setFooter({ text: 'RadianiteDB Live Lobby Radar • Données Riot Games PvP' })
-                        .setTimestamp();
-
-                    return interaction.editReply({ embeds: [liveEmbed] });
-                }
-
-            } catch (liveErr) {
-                console.warn('[RadianiteBot] Live lobby probe notice:', liveErr.message);
-            }
-        }
-
-        // Fallback / Standard: If not in a live game or queried by pseudo
-        if (!targetRiotId) {
-            if (userSession?.username && userSession.username.includes('#')) {
-                targetRiotId = userSession.username;
-            } else {
-                const sub = await knex('followed_players').where({ user_id: dbUser?.id || 0 }).first();
-                if (sub) targetRiotId = sub.riot_id;
-            }
-        }
-
-        if (!targetRiotId || !targetRiotId.includes('#')) {
-            return interaction.editReply({
-                content: `❌ **Veuillez préciser un joueur à analyser :** \`/scout joueur: Pseudo#TAG\`\n*(Ou connectez votre compte avec **/login** pour que le bot détecte vos parties en direct !)*`
-            });
-        }
-
-        const [name, tag] = targetRiotId.split('#');
-
-        try {
-            const [mmrRes, matchesRes] = await Promise.all([
-                henrikApi.get(`/valorant/v2/mmr/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null),
-                henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=5`).catch(() => null)
-            ]);
-
-            const mmrData = mmrRes?.data?.data?.current_data || {};
-            const highestTier = mmrRes?.data?.data?.highest_rank?.patched_tier || 'Inconnu';
-            const currentTier = mmrData.currenttierpatched || 'Non-classé';
-            const currentRR = mmrData.ranking_in_tier || 0;
-            const elo = mmrData.elo || 0;
-
-            const matches = matchesRes?.data?.data || [];
-            let wins = 0;
-            let totalKills = 0, totalDeaths = 0;
-            const agentCounts = {};
-
-            matches.forEach(m => {
-                const allP = m.players?.all_players || [];
-                const p = allP.find(x => x.name.toLowerCase() === name.toLowerCase());
-                if (p) {
-                    const team = m.teams?.[p.team?.toLowerCase()];
-                    if (team?.has_won) wins++;
-                    totalKills += p.stats?.kills || 0;
-                    totalDeaths += p.stats?.deaths || 0;
-                    const char = p.character || 'Inconnu';
-                    agentCounts[char] = (agentCounts[char] || 0) + 1;
-                }
-            });
-
-            const topAgent = Object.entries(agentCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Inconnu';
-            const recentKD = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills;
-            const winrate = matches.length > 0 ? Math.round((wins / matches.length) * 100) : 0;
-
-            const scoutEmbed = new EmbedBuilder()
-                .setTitle(`🕵️ DOSSIER TACTIQUE & SCOUTING • ${targetRiotId.toUpperCase()}`)
-                .setColor(0x00f5d4)
+        // Case 1: User is NOT logged in -> Display actionable login guide
+        if (!userSession?.accessToken || !userSession?.puuid) {
+            const notLoggedEmbed = new EmbedBuilder()
+                .setTitle('🔐 CONNEXION REQUISE POUR LE LIVE SCOUTING')
+                .setColor(0xff4655)
                 .setDescription(
-                    `🏆 **Rang Actuel :** **${currentTier}** (${currentRR} RR • ELO ${elo})\n` +
-                    `👑 **Peak Rank :** **${highestTier}**\n` +
-                    `────────────────────────────────────────\n` +
-                    `📊 **Performance sur les 5 derniers matchs :**\n` +
-                    `⚔️ **K/D Moyen :** **${recentKD}** (${totalKills} Kills / ${totalDeaths} Morts)\n` +
-                    `🎯 **Winrate Récent :** **${winrate}%** (${wins}V - ${matches.length - wins}D)\n` +
-                    `⭐ **Agent Préféré :** **${topAgent}**\n` +
-                    `────────────────────────────────────────\n` +
-                    `💡 *Pour voir le lobby complet des 10 joueurs en direct pendant un match, tapez **/login** pour lier votre compte, puis lancez **/scout** en cours de partie !*`
+                    `Pour espionner en direct les **10 joueurs de votre match** (rangs actuels, RR, Peak Ranks adverses), vous devez d'abord lier votre compte Riot Games !\n\n` +
+                    `👉 **Comment faire en 2 étapes rapides :**\n` +
+                    `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
+                    `2️⃣ Copiez l'URL de redirection et cliquez sur **"2. Coller mon lien de connexion"**.\n` +
+                    `3️⃣ Lancez une partie sur Valorant et réexécutez **/scout** !`
                 )
-                .setThumbnail(mmrData.images?.small || 'https://media.valorant-api.com/competitivetiers/03621f52-4cd8-5eab-4e5e-a4b5d63f9157/24/smallicon.png')
-                .setFooter({ text: 'RadianiteDB Intelligence Suite' })
-                .setTimestamp();
+                .setFooter({ text: 'RadianiteBot • Système de Détection Live Riot Games' });
 
-            return interaction.editReply({ embeds: [scoutEmbed] });
+            return interaction.editReply({
+                embeds: [notLoggedEmbed],
+                components: [createLoginActionRow()]
+            });
+        }
+
+        // Case 2: User IS logged in -> Probe Riot Core-Game & Pre-Game
+        try {
+            const shard = userSession.shard || 'eu';
+            const region = shard === 'eu' ? 'eu-1' : shard === 'na' ? 'na-1' : shard === 'kr' ? 'kr-1' : 'ap-1';
+            const riotHeaders = {
+                'Authorization': `Bearer ${userSession.accessToken}`,
+                'X-Riot-Entitlements-JWT': userSession.entitlementsToken,
+                'X-Riot-ClientPlatform': 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9',
+                'X-Riot-ClientVersion': cachedRiotVersion,
+                'User-Agent': 'ShooterGame/14 Windows/10.0.19042.1.256.64bit'
+            };
+
+            // A. Check Core-Game (In-Match)
+            let liveMatchData = null;
+            let isPregame = false;
+
+            try {
+                const corePlayerRes = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/core-game/v1/players/${userSession.puuid}`, { headers: riotHeaders });
+                if (corePlayerRes.data?.MatchID) {
+                    const matchDetails = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/core-game/v1/matches/${corePlayerRes.data.MatchID}`, { headers: riotHeaders });
+                    liveMatchData = matchDetails.data;
+                }
+            } catch (cErr) {}
+
+            // B. Check Pre-Game (Agent Select) if not in core-game
+            if (!liveMatchData) {
+                try {
+                    const prePlayerRes = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/pregame/v1/players/${userSession.puuid}`, { headers: riotHeaders });
+                    if (prePlayerRes.data?.MatchID) {
+                        const matchDetails = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/pregame/v1/matches/${prePlayerRes.data.MatchID}`, { headers: riotHeaders });
+                        liveMatchData = matchDetails.data;
+                        isPregame = true;
+                    }
+                } catch (pErr) {}
+            }
+
+            // Case 3: Live match is ACTIVE! Build full 10-player scouting radar
+            if (liveMatchData && liveMatchData.Players?.length > 0) {
+                const myPlayer = liveMatchData.Players.find(p => p.Subject === userSession.puuid);
+                const myTeamId = myPlayer?.TeamID || 'Blue';
+                
+                const allyTeam = [];
+                const enemyTeam = [];
+
+                for (const p of liveMatchData.Players) {
+                    let pName = 'Inconnu';
+                    let pTag = '';
+                    let pTier = 'Non-classé';
+                    let pPeak = 'Inconnu';
+                    let pRR = 0;
+
+                    try {
+                        const mmrRes = await henrikApi.get(`/valorant/v2/by-puuid/mmr/${shard}/${p.Subject}`).catch(() => null);
+                        if (mmrRes?.data?.data) {
+                            const d = mmrRes.data.data;
+                            pName = d.name || 'Joueur';
+                            pTag = d.tag || '';
+                            pTier = d.current_data?.currenttierpatched || 'Non-classé';
+                            pRR = d.current_data?.ranking_in_tier || 0;
+                            pPeak = d.highest_rank?.patched_tier || 'Inconnu';
+                        }
+                    } catch (hErr) {}
+
+                    const playerInfo = {
+                        puuid: p.Subject,
+                        riotId: pTag ? `${pName}#${pTag}` : pName,
+                        tier: pTier,
+                        peak: pPeak,
+                        rr: pRR,
+                        isSelf: p.Subject === userSession.puuid
+                    };
+
+                    if (p.TeamID === myTeamId) {
+                        allyTeam.push(playerInfo);
+                    } else {
+                        enemyTeam.push(playerInfo);
+                    }
+                    await sleep(250);
+                }
+
+                const liveEmbed = new EmbedBuilder()
+                    .setTitle(`🔴 RADAR LIVE MATCH • LOBBY ACTIF (${isPregame ? 'Sélection des Agents' : 'En Match'})`)
+                    .setColor(0x00f5d4)
+                    .setDescription(
+                        `🎮 **Mode :** ${liveMatchData.ModeID ? path.basename(liveMatchData.ModeID) : 'Compétitif'}\n` +
+                        `🗺️ **Map ID :** ${liveMatchData.MapID ? path.basename(liveMatchData.MapID) : 'Actuelle'}\n` +
+                        `────────────────────────────────────────\n` +
+                        `🔵 **ÉQUIPE ALLIÉE (${allyTeam.length} joueurs) :**\n` +
+                        allyTeam.map((p, idx) => `**${idx + 1}.** ${p.isSelf ? `👉 **${p.riotId}** (Vous)` : `**${p.riotId}**`} — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
+                        `\n\n────────────────────────────────────────\n` +
+                        `🔴 **ÉQUIPE ADVERSE (${enemyTeam.length} joueurs) :**\n` +
+                        enemyTeam.map((p, idx) => `**${idx + 1}.** **${p.riotId}** — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
+                        `\n────────────────────────────────────────`
+                    )
+                    .setFooter({ text: 'RadianiteDB Live Lobby Radar • Données Officielles Riot Games' })
+                    .setTimestamp();
+
+                return interaction.editReply({ embeds: [liveEmbed] });
+            }
+
+            // Case 4: Logged in, but NOT currently in match/agent select
+            const notInGameEmbed = new EmbedBuilder()
+                .setTitle('⚠️ AUCUNE PARTIE EN DIRECT DÉTECTÉE')
+                .setColor(0xffb703)
+                .setDescription(
+                    `👤 **Compte vérifié :** **${userSession.username || 'Connecté'}**\n\n` +
+                    `Le bot n'a détecté aucune partie en cours sur votre compte.\n\n` +
+                    `👉 **Pour lancer le radar de partie :**\n` +
+                    `1️⃣ Lancez une recherche de match sur Valorant.\n` +
+                    `2️⃣ Dès que vous entrez en **sélection d'agents** ou en **partie**, tapez **/scout** sur Discord.\n` +
+                    `3️⃣ Le bot affichera instantanément les 10 joueurs du lobby, leurs rangs et leurs Peak Ranks !`
+                )
+                .setFooter({ text: 'RadianiteBot • Surveillance Live' });
+
+            return interaction.editReply({ embeds: [notInGameEmbed] });
 
         } catch (err) {
-            console.error('[RadianiteBot] Erreur /scout:', err.message);
+            console.error('[RadianiteBot] Erreur /scout live:', err.message);
             return interaction.editReply({
-                content: `❌ Impossible de récupérer les données tactiques pour **${targetRiotId}**.`
+                content: `❌ Une erreur est survenue lors de l'interrogation des serveurs de jeu Riot Games : ${err.message}`
             });
         }
     }
