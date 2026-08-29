@@ -371,9 +371,17 @@ client.on('interactionCreate', async interaction => {
             const statsRes = await localApi.get(`/api/stats/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
             const data = statsRes.data;
 
+            // 1. Isolate CURRENT ACT statistics (exclude older acts)
+            const availableActs = data.availableActs || [];
+            const currentActObj = availableActs.find(a => a.id !== 'all' && a.count > 0) || availableActs[1] || availableActs[0];
+            const actId = currentActObj ? currentActObj.id : 'all';
+            const actName = currentActObj ? currentActObj.name : (lang === 'fr' ? 'ACTE ACTUEL' : 'CURRENT ACT');
+            const actStats = (data.statsByAct && data.statsByAct[actId]) || data;
+
             const pInfo = data.playerInfo || {};
             const rInfo = data.rankInfo || {};
-            const overview = data.overviewStats || {};
+            const overview = actStats.overviewStats || actStats;
+            const analysis = actStats.analysis || data.analysis || {};
 
             const rankName = rInfo.rankName || 'Unranked';
             const rr = rInfo.rr || 0;
@@ -383,38 +391,60 @@ client.on('interactionCreate', async interaction => {
             const adr = overview.adr || '0';
             const hs = overview.hsPercent || '0';
             const score = overview.statsScore || 0;
+            const gamesCount = overview.gameCount || 0;
+            const winsCount = Math.round((winRate / 100) * gamesCount);
 
-            const bestAgent = overview.bestAgent || data.analysis?.agents?.best?.name || 'Agent';
+            // 2. Select Best Agent & Best Map with >= 3 matches threshold
+            let bestAgentStr = 'None (Min 3m)';
+            const allAgentsList = analysis.allAgents || [];
+            const eligibleAgents = allAgentsList.filter(a => (a.count || 0) >= 3);
+            const chosenAgent = eligibleAgents.length > 0 ? eligibleAgents[0] : (analysis.agents?.best || allAgentsList[0]);
+            if (chosenAgent && chosenAgent.name) {
+                bestAgentStr = `${chosenAgent.name} (${chosenAgent.winRate ? chosenAgent.winRate.toFixed(0) : 0}% • ${chosenAgent.count || 0}m)`;
+            }
+
+            let bestMapStr = 'None (Min 3m)';
+            const allMapsList = analysis.allMaps || [];
+            const eligibleMaps = allMapsList.filter(m => (m.count || 0) >= 3);
+            const chosenMap = eligibleMaps.length > 0 ? eligibleMaps[0] : (analysis.maps?.best || allMapsList[0]);
+            if (chosenMap && chosenMap.name) {
+                bestMapStr = `${chosenMap.name} (${chosenMap.winRate ? chosenMap.winRate.toFixed(0) : 0}% • ${chosenMap.count || 0}m)`;
+            }
+
             const tierNum = (rInfo.tier !== undefined && rInfo.tier !== null) ? rInfo.tier : 18;
             const rrNum = rInfo.rr || 0;
             const lastChangeNum = rInfo.lastRRChange || 0;
 
-            // Large Rank Wheel Graphic with cache-buster
-            const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=360&v=3&t=${Date.now()}`;
+            // 3. High-resolution Rank Wheel graphic for maximum embed width
+            const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=420&v=4&t=${Date.now()}`;
             
             // Equipped In-Game Player Card Banner / Thumbnail
             const playerCardThumbnail = pInfo.cardSmall || pInfo.avatarUrl || pInfo.cardLarge || LOGO_ICON_URL;
 
+            // 4. Ultra-wide Tactical HUD Embed
             const embed = new EmbedBuilder()
                 .setAuthor({
                     name: `RadianiteDB • ${t.player_profile}`,
                     iconURL: LOGO_ICON_URL
                 })
-                .setTitle(`${pInfo.name || rawInput} • LVL ${pInfo.level || 1}`)
+                .setTitle(`${pInfo.name || rawInput}  •  LVL ${pInfo.level || 1}`)
                 .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(rawInput)}`)
                 .setColor(score >= 600 ? 0x00F5D4 : 0xFF4655)
                 .setThumbnail(playerCardThumbnail)
-                .setDescription(`${t.region}: **${pInfo.region || 'EU'}** • ${t.combat_score}: **${score} / 1000** ⚡`)
+                .setDescription(
+                    `🏆 **${actName.toUpperCase()}** • ${t.region}: **${pInfo.region || 'EU'}** • ${t.combat_score}: **${score} / 1000** ⚡\n` +
+                    `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`
+                )
                 .addFields(
-                    { name: t.current_rank, value: `**${rankName}**\n(${rr} RR)`, inline: true },
-                    { name: t.kd_ratio, value: `**${kd} K/D**\n(${overview.gameCount || 0} ${t.matches})`, inline: true },
-                    { name: t.win_rate, value: `**${winRate}%**\n(${Math.round((winRate/100) * (overview.gameCount || 0))} ${t.wins})`, inline: true },
-                    { name: t.acs_adr, value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
-                    { name: t.precision, value: `**${hs}% HS**`, inline: true },
-                    { name: t.top_agent, value: `**${bestAgent}**`, inline: true }
+                    { name: `${t.current_rank}`, value: `\`\`\`fix\n${rankName}\n${rr} RR\n\`\`\``, inline: true },
+                    { name: `${t.kd_ratio}`, value: `\`\`\`fix\n${kd} K/D\n${gamesCount} ${t.matches}\n\`\`\``, inline: true },
+                    { name: `${t.win_rate}`, value: `\`\`\`fix\n${winRate}%\n${winsCount} ${t.wins}\n\`\`\``, inline: true },
+                    { name: `${t.acs_adr}`, value: `\`\`\`fix\n${acs} ACS\n${adr} ADR\n\`\`\``, inline: true },
+                    { name: `${t.precision}`, value: `\`\`\`fix\n${hs}% Headshot\nAccuracy\n\`\`\``, inline: true },
+                    { name: `${t.top_agent}`, value: `\`\`\`fix\n${bestAgentStr}\n${bestMapStr}\n\`\`\``, inline: true }
                 )
                 .setImage(rankWheelUrl)
-                .setFooter({ text: t.footer, iconURL: LOGO_ICON_URL })
+                .setFooter({ text: `${t.footer} • ${actName}`, iconURL: LOGO_ICON_URL })
                 .setTimestamp();
 
             const row = new ActionRowBuilder().addComponents(
