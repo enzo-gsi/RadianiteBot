@@ -1430,20 +1430,19 @@ async function checkFollowedPlayers() {
                     let rankWheelUrl = null;
                     if (isCompetitive) {
                         try {
-                            const statsRes = await localApi.get(`/api/stats/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
-                            if (statsRes.data?.rankInfo) {
-                                const rInfo = statsRes.data.rankInfo;
-                                if (rInfo.lastRRChange !== undefined) {
-                                    const val = rInfo.lastRRChange;
-                                    rrChange = val > 0 ? `+${val} RR` : `${val} RR`;
-                                }
-                                const currentRR = rInfo.currentRR ?? rInfo.rr ?? 50;
-                                const rankTierNum = rInfo.currentTier ?? rInfo.tier ?? 18;
-                                const rawChangeNum = rInfo.lastRRChange || 0;
+                            const mmrHistRes = await henrikApi.get(`/valorant/v1/mmr-history/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
+                            const history = mmrHistRes.data?.data || [];
+                            // Match exact matchId or fallback to latest match entry in history
+                            const matchedEntry = history.find(h => h.match_id === latestMatchId) || history[0];
+                            if (matchedEntry) {
+                                const rawChangeNum = matchedEntry.mmr_change_to_last_game || 0;
+                                rrChange = rawChangeNum > 0 ? `+${rawChangeNum} RR` : `${rawChangeNum} RR`;
+                                const currentRR = matchedEntry.ranking_in_tier ?? 50;
+                                const rankTierNum = matchedEntry.currenttier || 18;
                                 rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?rr=${currentRR}&change=${rawChangeNum}&tier=${rankTierNum}&size=360&t=${Date.now()}`;
                             }
                         } catch (e) {
-                            // Direct HenrikDev fallback
+                            // Direct HenrikDev v2 fallback
                             try {
                                 const mmrRes = await henrikApi.get(`/valorant/v2/mmr/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
                                 const cData = mmrRes.data?.data?.current_data;
