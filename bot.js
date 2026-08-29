@@ -275,13 +275,16 @@ client.on('interactionCreate', async interaction => {
 
             const bestAgent = overview.bestAgent || data.analysis?.agents?.best?.name || 'Agent';
             const agentKey = bestAgent.toLowerCase();
-            const agentThumbnail = AGENT_ASSETS[agentKey] || pInfo.avatarUrl || 'https://media.valorant-api.com/agents/add6443a-41bd-e414-f6ad-e58d267f4e95/displayicon.png';
+            const tierNum = rInfo.tier || 21;
+            const rrNum = rInfo.rr || 0;
+            const lastChangeNum = rInfo.lastRRChange || 0;
+            const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=320`;
 
             const embed = new EmbedBuilder()
                 .setTitle(`📊 DOSSIER TACTIQUE // ${pInfo.name || rawInput}`)
                 .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(rawInput)}`)
                 .setColor(score >= 600 ? 0x00F5D4 : 0xFF4655)
-                .setThumbnail(agentThumbnail)
+                .setThumbnail(rankWheelUrl)
                 .setDescription(`Niveau de compte: **LVL ${pInfo.level || 1}** • Région: **${pInfo.region || 'EU'}**\nCombat Rating: **${score} / 1000** ⚡`)
                 .addFields(
                     { name: '🏆 Rang Actuel', value: `**${rankName}**\n${rr} RR`, inline: true },
@@ -494,17 +497,26 @@ async function checkFollowedPlayers() {
 
                     // Récupérer le changement de RR si disponible
                     let rrChangeStr = null;
+                    let rrChangeNum = 0;
+                    let currentRRNum = 50;
+                    let currentTierNum = playerObj.currenttier || 21;
                     let currentRankStr = playerObj.currenttier_patched || 'Classé';
                     try {
                         const localStats = await localApi.get(`/api/stats/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
                         if (localStats.data?.rankInfo) {
                             currentRankStr = localStats.data.rankInfo.rankName || currentRankStr;
+                            currentTierNum = localStats.data.rankInfo.tier || currentTierNum;
+                            currentRRNum = localStats.data.rankInfo.rr || 0;
                             const ch = localStats.data.rankInfo.lastRRChange;
                             if (ch !== null && ch !== undefined && ch !== 0) {
+                                rrChangeNum = ch;
                                 rrChangeStr = ch > 0 ? `▲ +${ch} RR` : `▼ ${ch} RR`;
                             }
                         }
                     } catch (e) {}
+
+                    // Construction de la Roue de Rang Dynamique (Gain Vert / Perte Rouge)
+                    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&size=320`;
 
                     // Construction du somptueux Embed tactique
                     const embedColor = isWin ? 0x00F5D4 : 0xFF4655; // Cyan éclatant ou Rouge Valorant
@@ -521,7 +533,7 @@ async function checkFollowedPlayers() {
                         .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
                         .setColor(embedColor)
                         .setDescription(`Rapport de mission pour **${riotId}** (${(latestMatch.metadata?.mode || 'Competitive').toUpperCase()})`)
-                        .setThumbnail(agentIcon)
+                        .setThumbnail(rankWheelUrl)
                         .addFields(
                             { name: '👤 Agent Joué', value: `**${agentName}**`, inline: true },
                             { name: '⚔️ K / D / A', value: `**${kills} / ${deaths} / ${assists}**\n(${kd} K/D)`, inline: true },
