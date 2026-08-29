@@ -435,7 +435,14 @@ async function checkFollowedPlayers() {
         const subscriptions = await knex('followed_players')
             .join('users', 'users.id', 'followed_players.user_id')
             .whereNotNull('users.discord_channel_id')
-            .select('followed_players.riot_id', 'users.discord_channel_id', 'users.discord_id');
+            .select(
+                'followed_players.riot_id', 
+                'users.discord_channel_id', 
+                'users.discord_id',
+                'users.notify_mentions',
+                'users.notify_rankup_only',
+                'users.show_rank_wheel'
+            );
 
         if (subscriptions.length === 0) {
             return;
@@ -449,7 +456,10 @@ async function checkFollowedPlayers() {
             }
             playersToWatch.get(sub.riot_id).push({ 
                 channel: sub.discord_channel_id, 
-                user: sub.discord_id 
+                user: sub.discord_id,
+                notify_mentions: sub.notify_mentions !== false,
+                notify_rankup_only: !!sub.notify_rankup_only,
+                show_rank_wheel: sub.show_rank_wheel !== false
             });
         }
 
@@ -574,18 +584,28 @@ async function checkFollowedPlayers() {
                             .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
                     );
 
-                    // Envoyer aux salons des utilisateurs
+                    // Envoyer aux salons des utilisateurs selon leurs préférences
                     for (const target of targets) {
                         try {
+                            if (target.notify_rankup_only && !isRankup) {
+                                continue; // L'utilisateur ne souhaite que les alertes de promotion (Rank Up)
+                            }
+
                             const channel = await client.channels.fetch(target.channel);
                             if (channel) {
+                                const userEmbed = EmbedBuilder.from(embed);
+                                if (target.show_rank_wheel === false) {
+                                    userEmbed.setThumbnail(agentIcon);
+                                }
+
+                                const mentionStr = target.notify_mentions ? `<@${target.user}>, ` : '';
                                 const notificationText = isRankup 
-                                    ? `🎉 <@${target.user}>, **${riotId}** vient de **RANK UP** en **${currentRankStr}** !`
-                                    : `🔔 <@${target.user}>, **${riotId}** a terminé sa partie sur **${mapName}** !`;
+                                    ? `🎉 ${mentionStr}**${riotId}** vient de **RANK UP** en **${currentRankStr}** !`
+                                    : `🔔 ${mentionStr}**${riotId}** a terminé sa partie sur **${mapName}** !`;
 
                                 await channel.send({ 
                                     content: notificationText, 
-                                    embeds: [embed],
+                                    embeds: [userEmbed],
                                     components: [actionRow]
                                 });
                             }

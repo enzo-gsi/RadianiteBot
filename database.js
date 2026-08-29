@@ -67,7 +67,7 @@ function knex(tableName) {
                 whereNotNull: (notNullCol) => ({
                     select: async (...cols) => {
                         const res = await pool.query(`
-                            SELECT followed_players.riot_id, users.discord_channel_id, users.discord_id 
+                            SELECT followed_players.riot_id, users.discord_channel_id, users.discord_id, users.notify_mentions, users.notify_rankup_only, users.show_rank_wheel 
                             FROM followed_players 
                             JOIN users ON users.id = followed_players.user_id 
                             WHERE users.discord_channel_id IS NOT NULL
