@@ -323,15 +323,27 @@ async function handleStoreInteraction(interaction, tokenArg) {
         const rad = (balances['e59aa87c-4cbf-517a-5983-6e81511be9b7'] || 0).toLocaleString();
         const kc = (balances['85ca954a-41f2-ce94-9b45-8ca3dd39a00d'] || 0).toLocaleString();
 
+        const priceMap = {};
+        if (storeData.SkinsPanelLayout?.SingleItemStoreOffers) {
+            storeData.SkinsPanelLayout.SingleItemStoreOffers.forEach(o => {
+                const vpPrice = o.Cost?.['85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741'] || o.Cost?.['85AD13F7-3D1B-5128-9EB2-7CD8EE0B5741'];
+                if (vpPrice) priceMap[o.OfferID] = vpPrice;
+            });
+        }
+
         const offers = (storeData.SkinsPanelLayout?.SingleItemOffers || []).map(uuid => {
-            const item = valorantSkinLevelMap[uuid] || valorantWeaponMap[uuid] || { displayName: 'Skin d\'arme', price: 1775 };
-            return item;
+            const item = valorantSkinLevelMap[uuid] || valorantWeaponMap[uuid] || { displayName: 'Skin d\'arme' };
+            const exactPrice = priceMap[uuid] || 1775;
+            return { ...item, exactPrice };
         });
 
         const resetDuration = storeData.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds || 86400;
         const resetTimestamp = Math.floor(Date.now() / 1000) + resetDuration;
 
-        const mainEmbed = new EmbedBuilder()
+        const allEmbeds = [];
+
+        // 1. Header Embed with Balances & Rotation Countdown
+        const headerEmbed = new EmbedBuilder()
             .setTitle(`🛒 BOUTIQUE DU JOUR • ${username.toUpperCase()}`)
             .setColor(0x00f5d4)
             .setDescription(
@@ -342,38 +354,46 @@ async function handleStoreInteraction(interaction, tokenArg) {
             .setThumbnail('https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
             .setTimestamp();
 
+        allEmbeds.push(headerEmbed);
+
+        // 2. Individual Embed for each Skin with its actual image displayed
         offers.forEach((offer, idx) => {
-            mainEmbed.addFields({
-                name: `🔹 Skin #${idx + 1} : ${offer.displayName}`,
-                value: `💵 **Prix :** 1,775 VP | [Visualiser](${offer.displayIcon || 'https://www.radianitedb.lol/favicon.ico'})`,
-                inline: false
-            });
+            const skinEmbed = new EmbedBuilder()
+                .setColor(0x00f5d4)
+                .setTitle(`🔹 ${idx + 1}. ${offer.displayName}`)
+                .setDescription(`💵 **Prix :** **${offer.exactPrice.toLocaleString()} VP**`);
+
+            if (offer.displayIcon) {
+                skinEmbed.setImage(offer.displayIcon);
+            }
+            allEmbeds.push(skinEmbed);
         });
 
-        // Featured Bundle
+        // 3. Featured Bundle (if active)
         const bundleObj = storeData.FeaturedBundle?.Bundle || storeData.FeaturedBundle?.Bundles?.[0];
         if (bundleObj) {
             const bInfo = valorantBundleMap[bundleObj.DataAssetID] || {};
-            mainEmbed.addFields({
-                name: `📦 Pack en Vedette : ${bInfo.displayName || 'Collection Spéciale'}`,
-                value: `✨ Disponible pour un temps limité • [Consulter sur RadianiteDB](${YOUR_WEBSITE_URL}/#store)`,
-                inline: false
-            });
+            const bundleEmbed = new EmbedBuilder()
+                .setColor(0xffb703)
+                .setTitle(`📦 Pack en Vedette : ${bInfo.displayName || 'Collection Spéciale'}`)
+                .setDescription(`✨ Disponible pour un temps limité • [Consulter sur RadianiteDB](${YOUR_WEBSITE_URL}/#store)`);
             if (bInfo.displayIcon2 || bInfo.displayIcon) {
-                mainEmbed.setImage(bInfo.displayIcon2 || bInfo.displayIcon);
+                bundleEmbed.setImage(bInfo.displayIcon2 || bInfo.displayIcon);
             }
+            allEmbeds.push(bundleEmbed);
         }
 
-        // Night Market (if active)
+        // 4. Night Market Notice (if active)
         if (storeData.BonusStore?.BonusStoreOffers) {
-            mainEmbed.addFields({
-                name: `🌙 Marché Nocturne Détecté !`,
-                value: `👉 **${storeData.BonusStore.BonusStoreOffers.length} offres à prix réduit** disponibles sur votre compte ! Rendez-vous sur **${YOUR_WEBSITE_URL}/#store** pour les inspecter.`,
-                inline: false
-            });
+            const nmEmbed = new EmbedBuilder()
+                .setColor(0x7209b7)
+                .setTitle(`🌙 Marché Nocturne Détecté !`)
+                .setDescription(`👉 **${storeData.BonusStore.BonusStoreOffers.length} offres à prix réduit** disponibles sur votre compte ! Rendez-vous sur **${YOUR_WEBSITE_URL}/#store** pour les inspecter.`);
+            allEmbeds.push(nmEmbed);
         }
 
-        await interaction.editReply({ embeds: [mainEmbed] });
+        const finalEmbeds = allEmbeds.slice(0, 10);
+        await interaction.editReply({ embeds: finalEmbeds });
 
     } catch (err) {
         console.error("[RadianiteBot] Erreur chargement boutique:", err.response?.data || err.message);
