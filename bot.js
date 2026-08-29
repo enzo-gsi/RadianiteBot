@@ -233,6 +233,10 @@ const commands = [
         description: 'Classement compétitif du serveur Discord (Top RR, Rangs, K/D).',
     },
     {
+        name: 'leaderboard',
+        description: 'Server competitive leaderboard (Top RR, Ranks, K/D).',
+    },
+    {
         name: 'session',
         description: 'Rapport de performance des parties jouées sur les dernières 24h.',
         options: [
@@ -343,6 +347,7 @@ function createLoginActionRow() {
 async function handleStoreInteraction(interaction, tokenArg) {
     await interaction.deferReply({ ephemeral: true });
 
+    const isEn = (await getUserLang(interaction.user.id)) === 'en';
     let authSession = null;
 
     // 1. Direct token/link passed in command
@@ -365,7 +370,9 @@ async function handleStoreInteraction(interaction, tokenArg) {
                 }
             } catch (err) {
                 return interaction.editReply({
-                    content: `❌ **Le lien ou jeton Riot fourni est invalide ou a expiré.**\nVeuillez vous reconnecter via les boutons ci-dessous.`,
+                    content: isEn 
+                        ? `❌ **The provided Riot link or token is invalid or expired.**\nPlease reconnect using the buttons below.`
+                        : `❌ **Le lien ou jeton Riot fourni est invalide ou a expiré.**\nVeuillez vous reconnecter via les boutons ci-dessous.`,
                     components: [createLoginActionRow()]
                 });
             }
@@ -383,15 +390,22 @@ async function handleStoreInteraction(interaction, tokenArg) {
     // 3. If still no session, provide interactive buttons
     if (!authSession) {
         const loginEmbed = new EmbedBuilder()
-            .setTitle('🛒 BOUTIQUE VALORANT • CONNEXION REQUISE')
+            .setTitle(isEn ? '🛒 VALORANT STORE • LOGIN REQUIRED' : '🛒 BOUTIQUE VALORANT • CONNEXION REQUISE')
             .setColor(0x00f5d4)
             .setDescription(
-                `Pour afficher votre boutique du jour en direct, liez votre compte Riot au bot (session persistante chiffrée AES-256).\n\n` +
-                `**Étapes simples (1-Clic) :**\n` +
-                `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
-                `2️⃣ Connectez-vous sur la page officielle Riot Games.\n` +
-                `3️⃣ Copiez l'URL de redirection (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
-                `4️⃣ Cliquez sur **"2. Coller mon lien de connexion"** pour valider !`
+                isEn
+                    ? `To view your live daily store, link your Riot account to the bot (persistent AES-256 encrypted session).\n\n` +
+                      `**Quick & Easy Steps (1-Click) :**\n` +
+                      `1️⃣ Click **"1. Sign in with Riot Games"** below.\n` +
+                      `2️⃣ Sign in on the official Riot Games page.\n` +
+                      `3️⃣ Copy the redirect URL (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
+                      `4️⃣ Click **"2. Paste connection link"** to validate!`
+                    : `Pour afficher votre boutique du jour en direct, liez votre compte Riot au bot (session persistante chiffrée AES-256).\n\n` +
+                      `**Étapes simples (1-Clic) :**\n` +
+                      `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
+                      `2️⃣ Connectez-vous sur la page officielle Riot Games.\n` +
+                      `3️⃣ Copiez l'URL de redirection (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
+                      `4️⃣ Cliquez sur **"2. Coller mon lien de connexion"** pour valider !`
             );
         return interaction.editReply({
             embeds: [loginEmbed],
@@ -429,7 +443,7 @@ async function handleStoreInteraction(interaction, tokenArg) {
         }
 
         const offers = (storeData.SkinsPanelLayout?.SingleItemOffers || []).map(uuid => {
-            const item = valorantSkinLevelMap[uuid] || valorantWeaponMap[uuid] || { displayName: 'Skin d\'arme' };
+            const item = valorantSkinLevelMap[uuid] || valorantWeaponMap[uuid] || { displayName: isEn ? 'Weapon Skin' : 'Skin d\'arme' };
             const exactPrice = priceMap[uuid] || 1775;
             return { ...item, exactPrice };
         });
@@ -441,12 +455,16 @@ async function handleStoreInteraction(interaction, tokenArg) {
 
         // 1. Header Embed with Balances & Rotation Countdown
         const headerEmbed = new EmbedBuilder()
-            .setTitle(`🛒 BOUTIQUE DU JOUR • ${username.toUpperCase()}`)
+            .setTitle(isEn ? `🛒 DAILY STORE • ${username.toUpperCase()}` : `🛒 BOUTIQUE DU JOUR • ${username.toUpperCase()}`)
             .setColor(0x00f5d4)
             .setDescription(
-                `💰 **Vos Soldes :** **${vp} VP** | **${rad} RP** | **${kc} KC**\n` +
-                `🌐 **Serveur :** ${shard} • ⏱️ **Rotation dans :** <t:${resetTimestamp}:R>\n` +
-                `────────────────────────────────────────`
+                isEn
+                    ? `💰 **Your Balances :** **${vp} VP** | **${rad} RP** | **${kc} KC**\n` +
+                      `🌐 **Server :** ${shard} • ⏱️ **Rotation in :** <t:${resetTimestamp}:R>\n` +
+                      `────────────────────────────────────────`
+                    : `💰 **Vos Soldes :** **${vp} VP** | **${rad} RP** | **${kc} KC**\n` +
+                      `🌐 **Serveur :** ${shard} • ⏱️ **Rotation dans :** <t:${resetTimestamp}:R>\n` +
+                      `────────────────────────────────────────`
             )
             .setThumbnail('https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
             .setTimestamp();
@@ -458,7 +476,7 @@ async function handleStoreInteraction(interaction, tokenArg) {
             const skinEmbed = new EmbedBuilder()
                 .setColor(0x00f5d4)
                 .setTitle(`🔹 ${idx + 1}. ${offer.displayName}`)
-                .setDescription(`💵 **Prix :** **${offer.exactPrice.toLocaleString()} VP**`);
+                .setDescription(isEn ? `💵 **Price :** **${offer.exactPrice.toLocaleString()} VP**` : `💵 **Prix :** **${offer.exactPrice.toLocaleString()} VP**`);
 
             if (offer.displayIcon) {
                 skinEmbed.setImage(offer.displayIcon);
@@ -472,8 +490,8 @@ async function handleStoreInteraction(interaction, tokenArg) {
             const bInfo = valorantBundleMap[bundleObj.DataAssetID] || {};
             const bundleEmbed = new EmbedBuilder()
                 .setColor(0xffb703)
-                .setTitle(`📦 Pack en Vedette : ${bInfo.displayName || 'Collection Spéciale'}`)
-                .setDescription(`✨ Disponible pour un temps limité • [Consulter sur RadianiteDB](${YOUR_WEBSITE_URL}/#store)`);
+                .setTitle(isEn ? `📦 Featured Bundle : ${bInfo.displayName || 'Special Collection'}` : `📦 Pack en Vedette : ${bInfo.displayName || 'Collection Spéciale'}`)
+                .setDescription(isEn ? `✨ Available for a limited time • [View on RadianiteDB](${YOUR_WEBSITE_URL}/#store)` : `✨ Disponible pour un temps limité • [Consulter sur RadianiteDB](${YOUR_WEBSITE_URL}/#store)`);
             if (bInfo.displayIcon2 || bInfo.displayIcon) {
                 bundleEmbed.setImage(bInfo.displayIcon2 || bInfo.displayIcon);
             }
@@ -484,8 +502,8 @@ async function handleStoreInteraction(interaction, tokenArg) {
         if (storeData.BonusStore?.BonusStoreOffers) {
             const nmEmbed = new EmbedBuilder()
                 .setColor(0x7209b7)
-                .setTitle(`🌙 Marché Nocturne Détecté !`)
-                .setDescription(`👉 **${storeData.BonusStore.BonusStoreOffers.length} offres à prix réduit** disponibles sur votre compte ! Rendez-vous sur **${YOUR_WEBSITE_URL}/#store** pour les inspecter.`);
+                .setTitle(isEn ? `🌙 Night.Market Detected!` : `🌙 Marché Nocturne Détecté !`)
+                .setDescription(isEn ? `👉 **${storeData.BonusStore.BonusStoreOffers.length} discounted offers** are available on your account! Visit **${YOUR_WEBSITE_URL}/#store** to check them.` : `👉 **${storeData.BonusStore.BonusStoreOffers.length} offres à prix réduit** disponibles sur votre compte ! Rendez-vous sur **${YOUR_WEBSITE_URL}/#store** pour les inspecter.`);
             allEmbeds.push(nmEmbed);
         }
 
@@ -495,9 +513,104 @@ async function handleStoreInteraction(interaction, tokenArg) {
     } catch (err) {
         console.error("[RadianiteBot] Erreur chargement boutique:", err.response?.data || err.message);
         await interaction.editReply({
-            content: `❌ **Impossible de charger votre boutique Valorant.**\nVotre session a expiré ou Riot bloque l'accès temporairement. Veuillez renouveler votre connexion ci-dessous.`,
+            content: isEn 
+                ? `❌ **Unable to load your Valorant store.**\nYour session expired or Riot is temporarily rate-limiting. Please renew your session using the buttons below.`
+                : `❌ **Impossible de charger votre boutique Valorant.**\nVotre session a expiré ou Riot bloque l'accès temporairement. Veuillez renouveler votre connexion ci-dessous.`,
             components: [createLoginActionRow()]
         });
+    }
+}
+
+// Helper: Determine User Language from Database ('fr' or 'en')
+async function getUserLang(discordId) {
+    if (!discordId) return 'fr';
+    try {
+        const u = await knex('users').where({ discord_id: String(discordId) }).first();
+        return u?.language === 'en' ? 'en' : 'fr';
+    } catch (e) {
+        return 'fr';
+    }
+}
+
+// Helper: Generate 24h Session Performance Report (Bilingual)
+async function generateSessionReport(targetRiotId, isEn = false) {
+    const [name, tag] = targetRiotId.split('#');
+    if (!name || !tag) return null;
+
+    try {
+        const matchesRes = await henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=10`).catch(() => null);
+        const matches = matchesRes?.data?.data || [];
+        const oneDayAgo = (Date.now() / 1000) - (24 * 3600);
+        const recent24h = matches.filter(m => (m.metadata?.game_start || 0) >= oneDayAgo);
+
+        if (recent24h.length === 0) return null;
+
+        let wins = 0, losses = 0;
+        let totalKills = 0, totalDeaths = 0, totalAssists = 0;
+        let totalScore = 0, totalRounds = 0;
+        let totalHeadshots = 0, totalShots = 0;
+        const agentCounts = {};
+
+        recent24h.forEach(m => {
+            const allP = m.players?.all_players || [];
+            const p = allP.find(x => x.name.toLowerCase() === name.toLowerCase());
+            if (p) {
+                const team = m.teams?.[p.team?.toLowerCase()];
+                if (team?.has_won) wins++;
+                else losses++;
+
+                totalKills += p.stats?.kills || 0;
+                totalDeaths += p.stats?.deaths || 0;
+                totalAssists += p.stats?.assists || 0;
+                totalScore += p.stats?.score || 0;
+                totalRounds += m.metadata?.rounds_played || 1;
+
+                const hs = p.stats?.headshots || 0;
+                const bs = p.stats?.bodyshots || 0;
+                const ls = p.stats?.legshots || 0;
+                totalHeadshots += hs;
+                totalShots += (hs + bs + ls);
+
+                const char = p.character || 'Inconnu';
+                agentCounts[char] = (agentCounts[char] || 0) + 1;
+            }
+        });
+
+        const topAgent = Object.entries(agentCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || (isEn ? 'Unknown' : 'Inconnu');
+        const overallKD = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills;
+        const winrate = Math.round((wins / recent24h.length) * 100);
+        const avgAcs = totalRounds > 0 ? Math.round(totalScore / totalRounds) : 0;
+        const avgHs = totalShots > 0 ? Math.round((totalHeadshots / totalShots) * 100) : 0;
+
+        return new EmbedBuilder()
+            .setTitle(isEn ? `📊 24H SESSION REPORT • ${targetRiotId.toUpperCase()}` : `📊 RAPPORT DE SESSION 24H • ${targetRiotId.toUpperCase()}`)
+            .setColor(winrate >= 50 ? 0x00f5d4 : 0xff4655)
+            .setDescription(
+                (isEn
+                    ? `🎮 **Matches Played :** **${recent24h.length}** (${wins}W - ${losses}L • **${winrate}% WR**)\n` +
+                      `────────────────────────────────────────\n` +
+                      `⚔️ **Overall K/D :** **${overallKD}** (${totalKills}K / ${totalDeaths}D / ${totalAssists}A)\n` +
+                      `💥 **Average ACS :** **${avgAcs}**\n` +
+                      `🎯 **Headshot % :** **${avgHs}%**\n` +
+                      `⭐ **Favorite Agent :** **${topAgent}**\n` +
+                      `────────────────────────────────────────\n` +
+                      `🔗 [View full profile on RadianiteDB](${YOUR_WEBSITE_URL}/#tracker)`
+                    : `🎮 **Parties Jouées :** **${recent24h.length}** (${wins}V - ${losses}D • **${winrate}% WR**)\n` +
+                      `────────────────────────────────────────\n` +
+                      `⚔️ **K/D Global :** **${overallKD}** (${totalKills}K / ${totalDeaths}D / ${totalAssists}A)\n` +
+                      `💥 **ACS Moyen :** **${avgAcs}**\n` +
+                      `🎯 **Tirs Tête (HS) :** **${avgHs}%**\n` +
+                      `⭐ **Agent le plus joué :** **${topAgent}**\n` +
+                      `────────────────────────────────────────\n` +
+                      `🔗 [Consulter le profil complet sur RadianiteDB](${YOUR_WEBSITE_URL}/#tracker)`
+                )
+            )
+            .setFooter({ text: 'RadianiteDB Session Intelligence' })
+            .setTimestamp();
+
+    } catch (e) {
+        console.error('[RadianiteBot] generateSessionReport error:', e.message);
+        return null;
     }
 }
 
@@ -581,6 +694,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'login') {
         await interaction.deferReply({ ephemeral: true });
 
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
         const username = interaction.options.getString('identifiant');
         const password = interaction.options.getString('mot_de_passe');
         const linkArg = interaction.options.getString('lien');
@@ -590,7 +704,9 @@ client.on('interactionCreate', async interaction => {
             const extracted = extractTokensFromUri(linkArg);
             if (!extracted.accessToken) {
                 return interaction.editReply({
-                    content: `❌ **Le lien fourni est invalide.**\nAssurez-vous qu'il contient \`access_token=...\` et provient bien de Riot Games.`
+                    content: isEn 
+                        ? `❌ **The provided link is invalid.**\nMake sure it includes \`access_token=...\` and originates from Riot Games.`
+                        : `❌ **Le lien fourni est invalide.**\nAssurez-vous qu'il contient \`access_token=...\` et provient bien de Riot Games.`
                 });
             }
 
@@ -615,14 +731,13 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 return interaction.editReply({
-                    content: `✅ **Compte Riot lié avec succès !**\n` +
-                             `👤 **Joueur :** **${sessionData.username}**\n` +
-                             `🌐 **Région :** ${sessionData.shard.toUpperCase()}\n\n` +
-                             `👉 Tapez **/boutique** ou **/store** pour consulter vos 4 skins du jour et vos soldes !`
+                    content: isEn
+                        ? `✅ **Riot account linked successfully!**\n👤 **Player :** **${sessionData.username}**\n🌐 **Region :** ${sessionData.shard.toUpperCase()}\n\n👉 Type **/store** or **/boutique** to view your daily shop!`
+                        : `✅ **Compte Riot lié avec succès !**\n👤 **Joueur :** **${sessionData.username}**\n🌐 **Région :** ${sessionData.shard.toUpperCase()}\n\n👉 Tapez **/boutique** ou **/store** pour consulter vos 4 skins du jour et vos soldes !`
                 });
             } catch (err) {
                 return interaction.editReply({
-                    content: `❌ Impossible de valider le jeton Riot : ${err.message}`
+                    content: isEn ? `❌ Unable to validate Riot token: ${err.message}` : `❌ Impossible de valider le jeton Riot : ${err.message}`
                 });
             }
         }
@@ -639,13 +754,17 @@ client.on('interactionCreate', async interaction => {
                     });
 
                     return interaction.editReply({
-                        content: `🔐 **Code 2FA Requis !**\nUn code de sécurité a été envoyé à **${result.email}**.\n👉 Tapez **/2fa code: 123456** pour finaliser votre connexion.`
+                        content: isEn
+                            ? `🔐 **2FA Code Required!**\nA security code was sent to **${result.email}**.\n👉 Type **/2fa code: 123456** to complete login.`
+                            : `🔐 **Code 2FA Requis !**\nUn code de sécurité a été envoyé à **${result.email}**.\n👉 Tapez **/2fa code: 123456** pour finaliser votre connexion.`
                     });
                 }
 
                 if (!result.success) {
                     return interaction.editReply({
-                        content: `❌ **Échec de connexion directe :** ${result.error}\n\n👉 **Conseil :** Utilisez le bouton ci-dessous pour vous connecter en 1-clic via la page officielle Riot Games :`,
+                        content: isEn 
+                            ? `❌ **Direct login failed:** ${result.error}\n\n👉 **Tip:** Use the button below to connect via the official Riot Games login page in 1 click:`
+                            : `❌ **Échec de connexion directe :** ${result.error}\n\n👉 **Conseil :** Utilisez le bouton ci-dessous pour vous connecter en 1-clic via la page officielle Riot Games :`,
                         components: [createLoginActionRow()]
                     });
                 }
@@ -669,17 +788,17 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 return interaction.editReply({
-                    content: `✅ **Compte Riot connecté avec succès !**\n` +
-                             `👤 **Joueur :** **${result.session.username}**\n` +
-                             `🌐 **Région :** ${result.session.shard.toUpperCase()}\n\n` +
-                             `🔒 *Votre session est chiffrée (AES-256) et reste persistante.*\n` +
-                             `👉 Tapez **/boutique** ou **/store** à tout moment pour voir vos skins du jour !`
+                    content: isEn
+                        ? `✅ **Riot account connected successfully!**\n👤 **Player :** **${result.session.username}**\n🌐 **Region :** ${result.session.shard.toUpperCase()}\n\n🔒 *Your session is encrypted (AES-256) and persistent.*\n👉 Type **/store** or **/boutique** to view your daily skins!`
+                        : `✅ **Compte Riot connecté avec succès !**\n👤 **Joueur :** **${result.session.username}**\n🌐 **Région :** ${result.session.shard.toUpperCase()}\n\n🔒 *Votre session est chiffrée (AES-256) et reste persistante.*\n👉 Tapez **/boutique** ou **/store** à tout moment pour voir vos skins du jour !`
                 });
 
             } catch (err) {
                 console.error('[RadianiteBot] Erreur /login:', err);
                 return interaction.editReply({
-                    content: `❌ Une erreur inattendue est survenue. Veuillez utiliser la méthode 1-clic ci-dessous :`,
+                    content: isEn 
+                        ? `❌ An unexpected error occurred. Please use the 1-click button below:`
+                        : `❌ Une erreur inattendue est survenue. Veuillez utiliser la méthode 1-clic ci-dessous :`,
                     components: [createLoginActionRow()]
                 });
             }
@@ -687,15 +806,22 @@ client.on('interactionCreate', async interaction => {
 
         // Case C: Neither provided -> Display Interactive Action Row with Buttons
         const loginEmbed = new EmbedBuilder()
-            .setTitle('🔐 CONNEXION COMPTE RIOT GAMES')
+            .setTitle(isEn ? '🔐 RIOT GAMES ACCOUNT LOGIN' : '🔐 CONNEXION COMPTE RIOT GAMES')
             .setColor(0x00f5d4)
             .setDescription(
-                `Connectez votre compte pour accéder à votre boutique quotidienne Valorant en direct !\n\n` +
-                `**Méthode Rapide & Recommandée (1-Clic) :**\n` +
-                `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
-                `2️⃣ Connectez-vous sur la page officielle Riot Games.\n` +
-                `3️⃣ Copiez l'URL de redirection (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
-                `4️⃣ Cliquez sur **"2. Coller mon lien de connexion"** pour valider !`
+                isEn
+                    ? `Connect your account to access your live Valorant daily store!\n\n` +
+                      `**Fast & Recommended Method (1-Click) :**\n` +
+                      `1️⃣ Click **"1. Sign in with Riot Games"** below.\n` +
+                      `2️⃣ Sign in on the official Riot Games page.\n` +
+                      `3️⃣ Copy the redirect URL (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
+                      `4️⃣ Click **"2. Paste connection link"** to validate!`
+                    : `Connectez votre compte pour accéder à votre boutique quotidienne Valorant en direct !\n\n` +
+                      `**Méthode Rapide & Recommandée (1-Clic) :**\n` +
+                      `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
+                      `2️⃣ Connectez-vous sur la page officielle Riot Games.\n` +
+                      `3️⃣ Copiez l'URL de redirection (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
+                      `4️⃣ Cliquez sur **"2. Coller mon lien de connexion"** pour valider !`
             );
 
         return interaction.editReply({
@@ -708,11 +834,14 @@ client.on('interactionCreate', async interaction => {
     if (commandName === '2fa') {
         await interaction.deferReply({ ephemeral: true });
 
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
         const pending = pending2FAMap.get(interaction.user.id);
         if (!pending || Date.now() > pending.expiresAt) {
             pending2FAMap.delete(interaction.user.id);
             return interaction.editReply({
-                content: `⚠️ **Aucune demande 2FA en attente ou le code a expiré.**\nVeuillez relancer la commande **/login**.`
+                content: isEn 
+                    ? `⚠️ **No pending 2FA challenge found or code expired.**\nPlease run **/login** again.`
+                    : `⚠️ **Aucune demande 2FA en attente ou le code a expiré.**\nVeuillez relancer la commande **/login**.`
             });
         }
 
@@ -722,7 +851,9 @@ client.on('interactionCreate', async interaction => {
 
         if (!result.success) {
             return interaction.editReply({
-                content: `❌ **${result.error || 'Code 2FA invalide.'}**\nVeuillez relancer **/login** si nécessaire.`
+                content: isEn 
+                    ? `❌ **${result.error || 'Invalid 2FA code.'}**\nPlease retry **/login** if needed.`
+                    : `❌ **${result.error || 'Code 2FA invalide.'}**\nVeuillez relancer **/login** si nécessaire.`
             });
         }
 
@@ -744,18 +875,21 @@ client.on('interactionCreate', async interaction => {
         }
 
         return interaction.editReply({
-            content: `✅ **Authentification 2FA validée !**\n` +
-                     `👤 **Joueur :** **${result.session.username}**\n\n` +
-                     `👉 Tapez **/boutique** ou **/store** pour consulter votre boutique du jour !`
+            content: isEn 
+                ? `✅ **2FA Authentication verified!**\n👤 **Player :** **${result.session.username}**\n\n👉 Type **/store** to view your daily shop!`
+                : `✅ **Authentification 2FA validée !**\n👤 **Joueur :** **${result.session.username}**\n\n👉 Tapez **/boutique** ou **/store** pour consulter votre boutique du jour !`
         });
     }
 
     // 3. /unlink Command
     if (commandName === 'unlink') {
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
         await knex('users').where({ discord_id: interaction.user.id }).update({ riot_auth: null });
         pending2FAMap.delete(interaction.user.id);
         return interaction.reply({
-            content: `🗑️ **Votre compte et session Riot ont été totalement supprimés du bot.**`,
+            content: isEn 
+                ? `🗑️ **Your Riot account and session have been completely unlinked from the bot.**`
+                : `🗑️ **Votre compte et session Riot ont été totalement supprimés du bot.**`,
             ephemeral: true
         });
     }
@@ -768,6 +902,7 @@ client.on('interactionCreate', async interaction => {
 
     // 5. /setchannel Command
     if (commandName === 'setchannel') {
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
         const discord_id = interaction.user.id;
         const channel_id = interaction.channel.id;
 
@@ -787,17 +922,20 @@ client.on('interactionCreate', async interaction => {
             }
             
             await interaction.reply({ 
-                content: `✅ **Salon configuré !** Les notifications de match pour vos joueurs suivis seront envoyées dans **#${interaction.channel.name}**.`,
+                content: isEn 
+                    ? `✅ **Alerts channel configured!** Match notifications for your tracked players will be sent in **#${interaction.channel.name}**.`
+                    : `✅ **Salon configuré !** Les notifications de match pour vos joueurs suivis seront envoyées dans **#${interaction.channel.name}**.`,
                 ephemeral: true 
             });
         } catch (err) {
             console.error(err);
-            await interaction.reply({ content: 'Une erreur est survenue lors de la configuration du salon.', ephemeral: true });
+            await interaction.reply({ content: isEn ? 'An error occurred while configuring channel.' : 'Une erreur est survenue lors de la configuration du salon.', ephemeral: true });
         }
     }
 
     // 6. /wishlist Command (Subcommands: ajouter, retirer, liste)
     if (commandName === 'wishlist') {
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
         const sub = interaction.options.getSubcommand();
 
         if (sub === 'ajouter') {
@@ -816,11 +954,13 @@ client.on('interactionCreate', async interaction => {
             });
 
             const embed = new EmbedBuilder()
-                .setTitle('⭐ SKIN AJOUTÉ À VOTRE WISHLIST !')
+                .setTitle(isEn ? '⭐ SKIN ADDED TO WISHLIST!' : '⭐ SKIN AJOUTÉ À VOTRE WISHLIST !')
                 .setColor(0x00f5d4)
                 .setDescription(
-                    `✨ **${finalName}** est désormais sous surveillance !\n\n` +
-                    `🔔 Dès que ce skin apparaîtra dans votre boutique quotidienne (à 02h00), vous recevrez automatiquement **une alerte en message privé (MP)** !`
+                    isEn
+                        ? `✨ **${finalName}** is now being tracked!\n\n🔔 As soon as this skin appears in your daily shop (at 02:00 CET), you will automatically receive a **private DM notification**!`
+                        : `✨ **${finalName}** est désormais sous surveillance !\n\n` +
+                          `🔔 Dès que ce skin apparaîtra dans votre boutique quotidienne (à 02h00), vous recevrez automatiquement **une alerte en message privé (MP)** !`
                 );
 
             if (foundSkin?.displayIcon) {
@@ -836,7 +976,9 @@ client.on('interactionCreate', async interaction => {
             await knex('wishlist').where({ discord_id: interaction.user.id, skin_name: skinName }).del();
 
             return interaction.editReply({
-                content: `🗑️ Le skin **${skinName}** a été retiré de votre liste de surveillance.`
+                content: isEn 
+                    ? `🗑️ **${skinName}** has been removed from your wishlist.`
+                    : `🗑️ Le skin **${skinName}** a été retiré de votre liste de surveillance.`
             });
         }
 
@@ -846,18 +988,22 @@ client.on('interactionCreate', async interaction => {
 
             if (userWishes.length === 0) {
                 return interaction.editReply({
-                    content: `📋 **Votre wishlist est vide.**\nUtilisez **/wishlist ajouter skin: ...** pour ajouter vos skins de rêve et recevoir une alerte automatique !`
+                    content: isEn
+                        ? `📋 **Your wishlist is empty.**\nUse **/wishlist ajouter skin: ...** to track skins and receive automatic DM alerts!`
+                        : `📋 **Votre wishlist est vide.**\nUtilisez **/wishlist ajouter skin: ...** pour ajouter vos skins de rêve et recevoir une alerte automatique !`
                 });
             }
 
             const listEmbed = new EmbedBuilder()
-                .setTitle(`⭐ VOS SKINS SURVEILLÉS (${userWishes.length})`)
+                .setTitle(isEn ? `⭐ YOUR WISHLIST WATCHLIST (${userWishes.length})` : `⭐ VOS SKINS SURVEILLÉS (${userWishes.length})`)
                 .setColor(0x00f5d4)
                 .setDescription(
                     userWishes.map((w, i) => `**${i + 1}.** ${w.skin_name}`).join('\n') +
-                    `\n\n🔔 *Une alerte privée vous sera envoyée dès leur apparition en boutique.*`
+                    (isEn 
+                        ? `\n\n🔔 *A private DM alert will be sent to you as soon as they appear in your store.*`
+                        : `\n\n🔔 *Une alerte privée vous sera envoyée dès leur apparition en boutique.*`)
                 )
-                .setFooter({ text: 'RadianiteBot • Surveillance Wishlist 24/7' });
+                .setFooter({ text: isEn ? 'RadianiteBot • 24/7 Wishlist Radar' : 'RadianiteBot • Surveillance Wishlist 24/7' });
 
             return interaction.editReply({ embeds: [listEmbed] });
         }
@@ -867,6 +1013,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'scout') {
         await interaction.deferReply({ ephemeral: false });
 
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
         const dbUser = await knex('users').where({ discord_id: interaction.user.id }).first();
         let userSession = null;
 
@@ -877,16 +1024,22 @@ client.on('interactionCreate', async interaction => {
         // Case 1: User is NOT logged in -> Display actionable login guide
         if (!userSession?.accessToken || !userSession?.puuid) {
             const notLoggedEmbed = new EmbedBuilder()
-                .setTitle('🔐 CONNEXION REQUISE POUR LE LIVE SCOUTING')
+                .setTitle(isEn ? '🔐 LOGIN REQUIRED FOR LIVE SCOUTING' : '🔐 CONNEXION REQUISE POUR LE LIVE SCOUTING')
                 .setColor(0xff4655)
                 .setDescription(
-                    `Pour espionner en direct les **10 joueurs de votre match** (rangs actuels, RR, Peak Ranks adverses), vous devez d'abord lier votre compte Riot Games !\n\n` +
-                    `👉 **Comment faire en 2 étapes rapides :**\n` +
-                    `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
-                    `2️⃣ Copiez l'URL de redirection et cliquez sur **"2. Coller mon lien de connexion"**.\n` +
-                    `3️⃣ Lancez une partie sur Valorant et réexécutez **/scout** !`
+                    isEn
+                        ? `To scout the **10 players in your live match** (current ranks, RR, enemy peak ranks), you must link your Riot Games account!\n\n` +
+                          `👉 **How to do it in 2 quick steps:**\n` +
+                          `1️⃣ Click **"1. Sign in with Riot Games"** below.\n` +
+                          `2️⃣ Copy the redirect URL and click **"2. Paste connection link"**.\n` +
+                          `3️⃣ Start a match on Valorant and re-run **/scout**!`
+                        : `Pour espionner en direct les **10 joueurs de votre match** (rangs actuels, RR, Peak Ranks adverses), vous devez d'abord lier votre compte Riot Games !\n\n` +
+                          `👉 **Comment faire en 2 étapes rapides :**\n` +
+                          `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
+                          `2️⃣ Copiez l'URL de redirection et cliquez sur **"2. Coller mon lien de connexion"**.\n` +
+                          `3️⃣ Lancez une partie sur Valorant et réexécutez **/scout** !`
                 )
-                .setFooter({ text: 'RadianiteBot • Système de Détection Live Riot Games' });
+                .setFooter({ text: 'RadianiteBot • Riot Games Live Radar' });
 
             return interaction.editReply({
                 embeds: [notLoggedEmbed],
@@ -939,21 +1092,21 @@ client.on('interactionCreate', async interaction => {
                 const enemyTeam = [];
 
                 for (const p of liveMatchData.Players) {
-                    let pName = 'Inconnu';
+                    let pName = isEn ? 'Player' : 'Joueur';
                     let pTag = '';
-                    let pTier = 'Non-classé';
-                    let pPeak = 'Inconnu';
+                    let pTier = isEn ? 'Unrated' : 'Non-classé';
+                    let pPeak = isEn ? 'Unknown' : 'Inconnu';
                     let pRR = 0;
 
                     try {
                         const mmrRes = await henrikApi.get(`/valorant/v2/by-puuid/mmr/${shard}/${p.Subject}`).catch(() => null);
                         if (mmrRes?.data?.data) {
                             const d = mmrRes.data.data;
-                            pName = d.name || 'Joueur';
+                            pName = d.name || (isEn ? 'Player' : 'Joueur');
                             pTag = d.tag || '';
-                            pTier = d.current_data?.currenttierpatched || 'Non-classé';
+                            pTier = d.current_data?.currenttierpatched || (isEn ? 'Unrated' : 'Non-classé');
                             pRR = d.current_data?.ranking_in_tier || 0;
-                            pPeak = d.highest_rank?.patched_tier || 'Inconnu';
+                            pPeak = d.highest_rank?.patched_tier || (isEn ? 'Unknown' : 'Inconnu');
                         }
                     } catch (hErr) {}
 
@@ -975,20 +1128,23 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 const liveEmbed = new EmbedBuilder()
-                    .setTitle(`🔴 RADAR LIVE MATCH • LOBBY ACTIF (${isPregame ? 'Sélection des Agents' : 'En Match'})`)
+                    .setTitle(
+                        isEn 
+                            ? `🔴 LIVE MATCH RADAR • ACTIVE LOBBY (${isPregame ? 'Agent Selection' : 'In Game'})`
+                            : `🔴 RADAR LIVE MATCH • LOBBY ACTIF (${isPregame ? 'Sélection des Agents' : 'En Match'})`
+                    )
                     .setColor(0x00f5d4)
                     .setDescription(
-                        `🎮 **Mode :** ${liveMatchData.ModeID ? path.basename(liveMatchData.ModeID) : 'Compétitif'}\n` +
-                        `🗺️ **Map ID :** ${liveMatchData.MapID ? path.basename(liveMatchData.MapID) : 'Actuelle'}\n` +
+                        `🎮 **Mode :** ${liveMatchData.ModeID ? path.basename(liveMatchData.ModeID) : (isEn ? 'Competitive' : 'Compétitif')}\n` +
+                        `🗺️ **Map ID :** ${liveMatchData.MapID ? path.basename(liveMatchData.MapID) : (isEn ? 'Current' : 'Actuelle')}\n` +
                         `────────────────────────────────────────\n` +
-                        `🔵 **ÉQUIPE ALLIÉE (${allyTeam.length} joueurs) :**\n` +
-                        allyTeam.map((p, idx) => `**${idx + 1}.** ${p.isSelf ? `👉 **${p.riotId}** (Vous)` : `**${p.riotId}**`} — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
-                        `\n\n────────────────────────────────────────\n` +
-                        `🔴 **ÉQUIPE ADVERSE (${enemyTeam.length} joueurs) :**\n` +
+                        (isEn ? `🔵 **ALLY TEAM (${allyTeam.length} players) :**\n` : `🔵 **ÉQUIPE ALLIÉE (${allyTeam.length} joueurs) :**\n`) +
+                        allyTeam.map((p, idx) => `**${idx + 1}.** ${p.isSelf ? `👉 **${p.riotId}** (${isEn ? 'You' : 'Vous'})` : `**${p.riotId}**`} — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
+                        (isEn ? `\n\n────────────────────────────────────────\n🔴 **ENEMY TEAM (${enemyTeam.length} players) :**\n` : `\n\n────────────────────────────────────────\n🔴 **ÉQUIPE ADVERSE (${enemyTeam.length} joueurs) :**\n`) +
                         enemyTeam.map((p, idx) => `**${idx + 1}.** **${p.riotId}** — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
                         `\n────────────────────────────────────────`
                     )
-                    .setFooter({ text: 'RadianiteDB Live Lobby Radar • Données Officielles Riot Games' })
+                    .setFooter({ text: 'RadianiteDB Live Lobby Radar • Riot Games PvP Data' })
                     .setTimestamp();
 
                 return interaction.editReply({ embeds: [liveEmbed] });
@@ -996,31 +1152,40 @@ client.on('interactionCreate', async interaction => {
 
             // Case 4: Logged in, but NOT currently in match/agent select
             const notInGameEmbed = new EmbedBuilder()
-                .setTitle('⚠️ AUCUNE PARTIE EN DIRECT DÉTECTÉE')
+                .setTitle(isEn ? '⚠️ NO LIVE MATCH DETECTED' : '⚠️ AUCUNE PARTIE EN DIRECT DÉTECTÉE')
                 .setColor(0xffb703)
                 .setDescription(
-                    `👤 **Compte vérifié :** **${userSession.username || 'Connecté'}**\n\n` +
-                    `Le bot n'a détecté aucune partie en cours sur votre compte.\n\n` +
-                    `👉 **Pour lancer le radar de partie :**\n` +
-                    `1️⃣ Lancez une recherche de match sur Valorant.\n` +
-                    `2️⃣ Dès que vous entrez en **sélection d'agents** ou en **partie**, tapez **/scout** sur Discord.\n` +
-                    `3️⃣ Le bot affichera instantanément les 10 joueurs du lobby, leurs rangs et leurs Peak Ranks !`
+                    isEn
+                        ? `👤 **Verified Account :** **${userSession.username || 'Connected'}**\n\n` +
+                          `The bot did not detect any active match on your account.\n\n` +
+                          `👉 **To launch the live radar :**\n` +
+                          `1️⃣ Start matchmaking on Valorant.\n` +
+                          `2️⃣ Once you enter **agent select** or **in game**, type **/scout** on Discord.\n` +
+                          `3️⃣ The bot will instantly display all 10 players, their ranks and Peak Ranks!`
+                        : `👤 **Compte vérifié :** **${userSession.username || 'Connecté'}**\n\n` +
+                          `Le bot n'a détecté aucune partie en cours sur votre compte.\n\n` +
+                          `👉 **Pour lancer le radar de partie :**\n` +
+                          `1️⃣ Lancez une recherche de match sur Valorant.\n` +
+                          `2️⃣ Dès que vous entrez en **sélection d'agents** ou en **partie**, tapez **/scout** sur Discord.\n` +
+                          `3️⃣ Le bot affichera instantanément les 10 joueurs du lobby, leurs rangs et leurs Peak Ranks !`
                 )
-                .setFooter({ text: 'RadianiteBot • Surveillance Live' });
+                .setFooter({ text: 'RadianiteBot • Live Radar' });
 
             return interaction.editReply({ embeds: [notInGameEmbed] });
 
         } catch (err) {
             console.error('[RadianiteBot] Erreur /scout live:', err.message);
             return interaction.editReply({
-                content: `❌ Une erreur est survenue lors de l'interrogation des serveurs de jeu Riot Games : ${err.message}`
+                content: isEn ? `❌ An error occurred while communicating with Riot Games servers: ${err.message}` : `❌ Une erreur est survenue lors de l'interrogation des serveurs de jeu Riot Games : ${err.message}`
             });
         }
     }
 
-    // 8. /classement Command (Server / Followed Players Leaderboard)
-    if (commandName === 'classement') {
+    // 8. /classement & /leaderboard Command
+    if (commandName === 'classement' || commandName === 'leaderboard') {
         await interaction.deferReply({ ephemeral: false });
+
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
 
         try {
             const followed = (await knex('followed_players').select()) || [];
@@ -1044,7 +1209,9 @@ client.on('interactionCreate', async interaction => {
 
             if (uniqueRiotIds.length === 0) {
                 return interaction.editReply({
-                    content: `🏆 Aucun joueur surveillé n'est encore enregistré dans la base de données. Liez votre compte avec **/login** ou suivez des joueurs sur le site !`
+                    content: isEn 
+                        ? `🏆 No tracked players found in database. Link your account with **/login** or follow players on the website!`
+                        : `🏆 Aucun joueur surveillé n'est encore enregistré dans la base de données. Liez votre compte avec **/login** ou suivez des joueurs sur le site !`
                 });
             }
 
@@ -1071,7 +1238,7 @@ client.on('interactionCreate', async interaction => {
 
             if (leaderboardList.length === 0) {
                 return interaction.editReply({
-                    content: `🏆 Impossible de récupérer les classements des joueurs enregistrés.`
+                    content: isEn ? `🏆 Unable to fetch rank data for registered players.` : `🏆 Impossible de récupérer les classements des joueurs enregistrés.`
                 });
             }
 
@@ -1080,16 +1247,16 @@ client.on('interactionCreate', async interaction => {
             const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
             const lbEmbed = new EmbedBuilder()
-                .setTitle(`🏆 CLASSEMENT COMPÉTITIF DU SERVEUR`)
+                .setTitle(isEn ? `🏆 SERVER COMPETITIVE LEADERBOARD` : `🏆 CLASSEMENT COMPÉTITIF DU SERVEUR`)
                 .setColor(0xffb703)
                 .setDescription(
-                    `Classement des joueurs suivis ordonné par **Rang & RR** :\n\n` +
+                    (isEn ? `Tracked players ranked by **Tier & RR** :\n\n` : `Classement des joueurs suivis ordonné par **Rang & RR** :\n\n`) +
                     leaderboardList.map((p, idx) => {
                         const medal = medals[idx] || '▫️';
                         return `${medal} **${idx + 1}. ${p.riotId}** — **${p.tierName}** (${p.rr} RR)`;
                     }).join('\n\n') +
                     `\n\n────────────────────────────────────────\n` +
-                    `🌐 *Mis à jour en temps réel via l'API officielle.*`
+                    (isEn ? `🌐 *Updated in real-time via official API.*` : `🌐 *Mis à jour en temps réel via l'API officielle.*`)
                 )
                 .setThumbnail('https://media.valorant-api.com/competitivetiers/03621f52-4cd8-5eab-4e5e-a4b5d63f9157/27/smallicon.png')
                 .setTimestamp();
@@ -1098,7 +1265,7 @@ client.on('interactionCreate', async interaction => {
 
         } catch (err) {
             console.error('[RadianiteBot] Erreur /classement:', err);
-            return interaction.editReply({ content: `❌ Erreur lors du calcul du classement.` });
+            return interaction.editReply({ content: isEn ? `❌ Error calculating leaderboard.` : `❌ Erreur lors du calcul du classement.` });
         }
     }
 
@@ -1106,6 +1273,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'session') {
         await interaction.deferReply({ ephemeral: false });
 
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
         let targetRiotId = interaction.options.getString('joueur');
 
         if (!targetRiotId) {
@@ -1122,14 +1290,16 @@ client.on('interactionCreate', async interaction => {
 
         if (!targetRiotId || !targetRiotId.includes('#')) {
             return interaction.editReply({
-                content: `❌ **Veuillez préciser un joueur :** \`/session joueur: Pseudo#TAG\``
+                content: isEn ? `❌ **Please specify a player :** \`/session joueur: Player#TAG\`` : `❌ **Veuillez préciser un joueur :** \`/session joueur: Pseudo#TAG\``
             });
         }
 
-        const report = await generateSessionReport(targetRiotId);
+        const report = await generateSessionReport(targetRiotId, isEn);
         if (!report) {
             return interaction.editReply({
-                content: `ℹ️ **Aucune partie jouée sur les dernières 24h pour ${targetRiotId}.**`
+                content: isEn 
+                    ? `ℹ️ **No matches played in the last 24 hours for ${targetRiotId}.**`
+                    : `ℹ️ **Aucune partie jouée sur les dernières 24h pour ${targetRiotId}.**`
             });
         }
 
@@ -1508,82 +1678,6 @@ async function checkFollowedPlayers() {
     console.log('[RadianiteBot] Vérification des matchs terminée avec succès.');
 }
 
-// --- HELPER: GENERATE 24H SESSION REPORT ---
-async function generateSessionReport(riotId) {
-    const [name, tag] = riotId.split('#');
-    if (!name || !tag) return null;
-
-    try {
-        const res = await henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=15`).catch(() => null);
-        const allMatches = res?.data?.data || [];
-        const past24hCutoff = Math.floor(Date.now() / 1000) - 86400;
-
-        const sessionMatches = allMatches.filter(m => (m.metadata?.game_start || 0) >= past24hCutoff);
-        if (sessionMatches.length === 0) return null;
-
-        let wins = 0;
-        let totalKills = 0, totalDeaths = 0, totalAssists = 0;
-        let totalScore = 0, totalRounds = 0;
-        let headshots = 0, bodyshots = 0, legshots = 0;
-        const agentStats = {};
-
-        sessionMatches.forEach(m => {
-            const players = m.players?.all_players || [];
-            const p = players.find(x => x.name.toLowerCase() === name.toLowerCase());
-            if (p) {
-                const team = m.teams?.[p.team?.toLowerCase()];
-                if (team?.has_won) wins++;
-                totalKills += p.stats?.kills || 0;
-                totalDeaths += p.stats?.deaths || 0;
-                totalAssists += p.stats?.assists || 0;
-                totalScore += p.stats?.score || 0;
-                totalRounds += m.metadata?.rounds_played || 1;
-                headshots += p.stats?.headshots || 0;
-                bodyshots += p.stats?.bodyshots || 0;
-                legshots += p.stats?.legshots || 0;
-
-                const char = p.character || 'Inconnu';
-                if (!agentStats[char]) agentStats[char] = { played: 0, wins: 0 };
-                agentStats[char].played++;
-                if (team?.has_won) agentStats[char].wins++;
-            }
-        });
-
-        const totalGames = sessionMatches.length;
-        const losses = totalGames - wins;
-        const winrate = Math.round((wins / totalGames) * 100);
-        const kd = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills;
-        const acs = totalRounds > 0 ? Math.round(totalScore / totalRounds) : 0;
-        const totalShots = headshots + bodyshots + legshots;
-        const hsPercent = totalShots > 0 ? Math.round((headshots / totalShots) * 100) : 0;
-
-        const sortedAgents = Object.entries(agentStats).sort((a, b) => b[1].played - a[1].played);
-        const bestAgentName = sortedAgents[0]?.[0] || 'Inconnu';
-        const bestAgentInfo = sortedAgents[0]?.[1] || { played: 0, wins: 0 };
-
-        const embed = new EmbedBuilder()
-            .setTitle(`☀️ RAPPORT DE SESSION • ${riotId.toUpperCase()}`)
-            .setColor(winrate >= 50 ? 0x00f5d4 : 0xff4655)
-            .setDescription(
-                `📊 **Bilan des dernières 24 heures :**\n\n` +
-                `🎮 **Parties jouées :** **${totalGames}** (${wins}V - ${losses}D • **${winrate}% Winrate**)\n` +
-                `⚔️ **Ratio K/D :** **${kd}** (${totalKills} Kills / ${totalDeaths} Morts / ${totalAssists} Assists)\n` +
-                `💥 **ACS Moyen :** **${acs}** | 🎯 **Précision Tête :** **${hsPercent}%**\n` +
-                `⭐ **Agent Principal :** **${bestAgentName}** (${bestAgentInfo.played} parties • ${Math.round((bestAgentInfo.wins / bestAgentInfo.played) * 100)}% Winrate)\n` +
-                `────────────────────────────────────────\n` +
-                `🔗 [Détails complets sur RadianiteDB](${YOUR_WEBSITE_URL}/#tracker)`
-            )
-            .setThumbnail(AGENT_ASSETS[bestAgentName.toLowerCase()] || 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
-            .setFooter({ text: 'RadianiteBot • Briefing de Session Quotidien' })
-            .setTimestamp();
-
-        return embed;
-    } catch (err) {
-        console.error(`[RadianiteBot] Erreur rapport de session pour ${riotId}:`, err.message);
-        return null;
-    }
-}
-
 // --- CRON: DAILY 10h00 SESSION REPORT ---
 async function sendDailySessionRecap() {
     console.log('[RadianiteBot] ⏰ Envoi automatique des rapports de session de 10h00...');
@@ -1591,16 +1685,19 @@ async function sendDailySessionRecap() {
         const subscriptions = await knex('followed_players')
             .join('users', 'users.id', 'followed_players.user_id')
             .whereNotNull('users.discord_channel_id')
-            .select('followed_players.riot_id', 'users.discord_channel_id', 'users.discord_id');
+            .select('followed_players.riot_id', 'users.discord_channel_id', 'users.discord_id', 'users.language');
 
         for (const sub of subscriptions) {
             try {
-                const report = await generateSessionReport(sub.riot_id);
+                const isEn = sub.language === 'en';
+                const report = await generateSessionReport(sub.riot_id, isEn);
                 if (report) {
                     const channel = await client.channels.fetch(sub.discord_channel_id);
                     if (channel) {
                         await channel.send({
-                            content: `☀️ <@${sub.discord_id}>, voici votre **briefing de session Valorant** des dernières 24h pour **${sub.riot_id}** :`,
+                            content: isEn 
+                                ? `☀️ <@${sub.discord_id}>, here is your 24h **Valorant session briefing** for **${sub.riot_id}**:`
+                                : `☀️ <@${sub.discord_id}>, voici votre **briefing de session Valorant** des dernières 24h pour **${sub.riot_id}** :`,
                             embeds: [report]
                         });
                     }
@@ -1619,7 +1716,7 @@ async function sendDailySessionRecap() {
 async function checkWishlists() {
     console.log('[RadianiteBot] ⭐ Vérification des Wishlists skins en cours...');
     try {
-        const users = await knex('users').whereNotNull('riot_auth').select('discord_id', 'riot_auth');
+        const users = await knex('users').whereNotNull('riot_auth').select('discord_id', 'riot_auth', 'language');
         for (const u of users) {
             try {
                 const wishes = await knex('wishlist').where({ discord_id: u.discord_id }).select();
@@ -1642,14 +1739,20 @@ async function checkWishlists() {
                         const discordUser = await client.users.fetch(u.discord_id).catch(() => null);
 
                         if (discordUser) {
+                            const isEn = u.language === 'en';
                             const alertEmbed = new EmbedBuilder()
-                                .setTitle('🚨 ALERTE WISHLIST • VOTRE SKIN EST EN BOUTIQUE !')
+                                .setTitle(isEn ? '🚨 WISHLIST ALERT • YOUR SKIN IS IN THE STORE!' : '🚨 ALERTE WISHLIST • VOTRE SKIN EST EN BOUTIQUE !')
                                 .setColor(0x00f5d4)
                                 .setDescription(
-                                    `🎉 Bonne nouvelle ! Le skin **${skinInfo.displayName}** est disponible dans votre boutique Valorant aujourd'hui !\n\n` +
-                                    `💵 **Prix :** 1,775 VP\n` +
-                                    `⏱️ **Attention :** Il disparaîtra lors de la prochaine rotation quotidienne à 02h00.\n\n` +
-                                    `👉 Tapez **/boutique** sur Discord pour voir l'ensemble de vos offres du jour !`
+                                    isEn
+                                        ? `🎉 Great news! The skin **${skinInfo.displayName}** is available in your Valorant store today!\n\n` +
+                                          `💵 **Price :** 1,775 VP\n` +
+                                          `⏱️ **Notice :** It will disappear at the next daily rotation at 02:00 CET.\n\n` +
+                                          `👉 Type **/store** on Discord to inspect all your daily offers!`
+                                        : `🎉 Bonne nouvelle ! Le skin **${skinInfo.displayName}** est disponible dans votre boutique Valorant aujourd'hui !\n\n` +
+                                          `💵 **Prix :** 1,775 VP\n` +
+                                          `⏱️ **Attention :** Il disparaîtra lors de la prochaine rotation quotidienne à 02h00.\n\n` +
+                                          `👉 Tapez **/boutique** sur Discord pour voir l'ensemble de vos offres du jour !`
                                 )
                                 .setImage(skinInfo.displayIcon || null)
                                 .setThumbnail('https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
