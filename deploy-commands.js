@@ -7,11 +7,11 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '1436123733197590624';
 const commands = [
     {
         name: 'boutique',
-        description: 'Affiche votre boutique quotidienne Valorant en direct, vos soldes VP et le Marché Nocturne.',
+        description: 'Boutique Valorant du jour, soldes VP/RP/KC et Marché Nocturne.',
         options: [
             {
                 name: 'lien_ou_token',
-                description: 'Optionnel: Collez un lien Riot officiel si votre compte n\'est pas encore lié via /login',
+                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
@@ -19,11 +19,11 @@ const commands = [
     },
     {
         name: 'store',
-        description: 'Affiche votre boutique quotidienne Valorant en direct (alias /boutique).',
+        description: 'Boutique Valorant du jour en direct (alias /boutique).',
         options: [
             {
                 name: 'lien_ou_token',
-                description: 'Optionnel: Collez un lien Riot officiel si votre compte n\'est pas encore lié via /login',
+                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
@@ -31,11 +31,11 @@ const commands = [
     },
     {
         name: 'shop',
-        description: 'Affiche votre boutique quotidienne Valorant en direct (alias /boutique).',
+        description: 'Boutique Valorant du jour en direct (alias /boutique).',
         options: [
             {
                 name: 'lien_ou_token',
-                description: 'Optionnel: Collez un lien Riot officiel si votre compte n\'est pas encore lié via /login',
+                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
@@ -43,23 +43,23 @@ const commands = [
     },
     {
         name: 'login',
-        description: 'Connecte votre compte Riot (session persistante chiffrée, mot de passe jamais stocké en clair).',
+        description: 'Lier votre compte Riot (session persistante chiffrée AES-256).',
         options: [
             {
                 name: 'identifiant',
-                description: 'Option 1: Votre nom d\'utilisateur Riot Games (login)',
+                description: 'Option 1: Nom d\'utilisateur Riot Games (login launcher)',
                 type: ApplicationCommandOptionType.String,
                 required: false
             },
             {
                 name: 'mot_de_passe',
-                description: 'Option 1: Votre mot de passe Riot Games',
+                description: 'Option 1: Mot de passe Riot Games',
                 type: ApplicationCommandOptionType.String,
                 required: false
             },
             {
                 name: 'lien',
-                description: 'Option 2: Collez directement votre lien officiel Riot (https://playvalorant.com/...#access_token=...)',
+                description: 'Option 2: Lien officiel Riot (playvalorant.com/opt_in...)',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
@@ -67,11 +67,11 @@ const commands = [
     },
     {
         name: '2fa',
-        description: 'Valide le code d\'authentification à deux facteurs Riot Games reçu par email.',
+        description: 'Valider le code de sécurité 2FA reçu par email.',
         options: [
             {
                 name: 'code',
-                description: 'Le code à 6 chiffres reçu par email',
+                description: 'Le code de sécurité à 6 chiffres reçu par email',
                 type: ApplicationCommandOptionType.String,
                 required: true
             }
@@ -79,11 +79,11 @@ const commands = [
     },
     {
         name: 'unlink',
-        description: 'Supprime définitivement votre session Riot enregistrée sur le bot.',
+        description: 'Supprimer définitivement votre session Riot du bot.',
     },
     {
         name: 'setchannel',
-        description: 'Définit ce salon Discord pour recevoir les alertes de fin de partie.',
+        description: 'Définir ce salon textuel pour les alertes de fin de match.',
     }
 ];
 
