@@ -421,7 +421,7 @@ client.on('interactionCreate', async interaction => {
             // Equipped In-Game Player Card Banner / Thumbnail
             const playerCardThumbnail = pInfo.cardSmall || pInfo.avatarUrl || pInfo.cardLarge || LOGO_ICON_URL;
 
-            // 4. Ultra-wide Tactical HUD Embed
+            // 4. Ultra-clean Tactical HUD Embed (Natural scaling, zero word-wrap clipping)
             const embed = new EmbedBuilder()
                 .setAuthor({
                     name: `RadianiteDB • ${t.player_profile}`,
@@ -431,17 +431,14 @@ client.on('interactionCreate', async interaction => {
                 .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(rawInput)}`)
                 .setColor(score >= 600 ? 0x00F5D4 : 0xFF4655)
                 .setThumbnail(playerCardThumbnail)
-                .setDescription(
-                    `🏆 **${actName.toUpperCase()}** • ${t.region}: **${pInfo.region || 'EU'}** • ${t.combat_score}: **${score} / 1000** ⚡\n` +
-                    `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`
-                )
+                .setDescription(`🏆 **${actName.toUpperCase()}** • ${t.region}: **${pInfo.region || 'EU'}** • ${t.combat_score}: **${score} / 1000** ⚡`)
                 .addFields(
-                    { name: `${t.current_rank}`, value: `\`\`\`fix\n${rankName}\n${rr} RR\n\`\`\``, inline: true },
-                    { name: `${t.kd_ratio}`, value: `\`\`\`fix\n${kd} K/D\n${gamesCount} ${t.matches}\n\`\`\``, inline: true },
-                    { name: `${t.win_rate}`, value: `\`\`\`fix\n${winRate}%\n${winsCount} ${t.wins}\n\`\`\``, inline: true },
-                    { name: `${t.acs_adr}`, value: `\`\`\`fix\n${acs} ACS\n${adr} ADR\n\`\`\``, inline: true },
-                    { name: `${t.precision}`, value: `\`\`\`fix\n${hs}% Headshot\nAccuracy\n\`\`\``, inline: true },
-                    { name: `${t.top_agent}`, value: `\`\`\`fix\n${bestAgentStr}\n${bestMapStr}\n\`\`\``, inline: true }
+                    { name: `🎖️ ${t.current_rank}`, value: `**${rankName}**\n(${rr} RR)`, inline: true },
+                    { name: `🎯 ${t.kd_ratio}`, value: `**${kd} K/D**\n(${gamesCount} ${t.matches})`, inline: true },
+                    { name: `📈 ${t.win_rate}`, value: `**${winRate}%**\n(${winsCount} ${t.wins})`, inline: true },
+                    { name: `⚡ ${t.acs_adr}`, value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
+                    { name: `🎯 ${t.precision}`, value: `**${hs}% HS**\nPrecision`, inline: true },
+                    { name: `👤 ${t.top_agent}`, value: `**${chosenAgent?.name || 'None'}**\n(${chosenAgent?.winRate ? chosenAgent.winRate.toFixed(0) : 0}% • ${chosenAgent?.count || 0}m)`, inline: true }
                 )
                 .setImage(rankWheelUrl)
                 .setFooter({ text: `${t.footer} • ${actName}`, iconURL: LOGO_ICON_URL })
