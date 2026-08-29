@@ -1105,16 +1105,37 @@ async function checkFollowedPlayers() {
 
                     const team = latestMatch.teams?.[playerStats.team?.toLowerCase()] || { has_won: false, rounds_won: 0, rounds_lost: 0 };
                     
-                    // RR change is ONLY fetched for Ranked/Competitive
+                    // RR change & dynamic Rank Wheel are ONLY fetched for Ranked/Competitive
                     let rrChange = null;
+                    let rankWheelUrl = null;
                     if (isCompetitive) {
                         try {
                             const statsRes = await localApi.get(`/api/stats/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
-                            if (statsRes.data?.rankInfo?.lastRRChange !== undefined) {
-                                const val = statsRes.data.rankInfo.lastRRChange;
-                                rrChange = val > 0 ? `+${val} RR` : `${val} RR`;
+                            if (statsRes.data?.rankInfo) {
+                                const rInfo = statsRes.data.rankInfo;
+                                if (rInfo.lastRRChange !== undefined) {
+                                    const val = rInfo.lastRRChange;
+                                    rrChange = val > 0 ? `+${val} RR` : `${val} RR`;
+                                }
+                                const currentRR = rInfo.currentRR ?? rInfo.rr ?? 50;
+                                const rankTierNum = rInfo.currentTier ?? rInfo.tier ?? 18;
+                                const rawChangeNum = rInfo.lastRRChange || 0;
+                                rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?rr=${currentRR}&change=${rawChangeNum}&tier=${rankTierNum}&size=360&t=${Date.now()}`;
                             }
-                        } catch (e) {}
+                        } catch (e) {
+                            // Direct HenrikDev fallback
+                            try {
+                                const mmrRes = await henrikApi.get(`/valorant/v2/mmr/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
+                                const cData = mmrRes.data?.data?.current_data;
+                                if (cData) {
+                                    const rawChangeNum = cData.mmr_change_to_last_game || 0;
+                                    rrChange = rawChangeNum > 0 ? `+${rawChangeNum} RR` : `${rawChangeNum} RR`;
+                                    const currentRR = cData.ranking_in_tier || 50;
+                                    const rankTierNum = cData.currenttier || 18;
+                                    rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?rr=${currentRR}&change=${rawChangeNum}&tier=${rankTierNum}&size=360&t=${Date.now()}`;
+                                }
+                            } catch (hErr) {}
+                        }
                     }
 
                     // Deathmatch specific placement & score
@@ -1140,6 +1161,7 @@ async function checkFollowedPlayers() {
                         playerStats,
                         team,
                         rrChange,
+                        rankWheelUrl,
                         isCompetitive,
                         isDeathmatch,
                         modeDisplay,
@@ -1233,8 +1255,11 @@ async function checkFollowedPlayers() {
                     )
                     .setTimestamp(new Date(match.metadata.game_start * 1000));
 
-                // Thumbnail: In non-ranked modes or DM, ALWAYS show agent icon (no rank wheel)
-                if (first.playerStats?.assets?.agent?.small) {
+                // Thumbnail: In Competitive / Ranked, display the dynamic Rank Wheel with RR delta!
+                // In non-ranked modes (Unrated, Spike Rush, Deathmatch), display the Agent icon!
+                if (isCompetitive && first.rankWheelUrl && userData.showRankWheel !== false) {
+                    mainEmbed.setThumbnail(first.rankWheelUrl);
+                } else if (first.playerStats?.assets?.agent?.small) {
                     mainEmbed.setThumbnail(first.playerStats.assets.agent.small);
                 }
 
