@@ -29,6 +29,13 @@ async function initDatabase() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(discord_id, skin_uuid)
             );
+
+            CREATE TABLE IF NOT EXISTS bot_analytics (
+                key VARCHAR(128) PRIMARY KEY,
+                count BIGINT DEFAULT 0,
+                meta TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         `);
     } catch (err) {}
 }
@@ -209,6 +216,47 @@ function knex(tableName) {
                 const res = await pool.query(`
                     INSERT INTO wishlist (${cols}) VALUES (${params}) 
                     ON CONFLICT (discord_id, skin_uuid) DO NOTHING
+                    RETURNING *
+                `, values);
+                return res.rows;
+            }
+        };
+    }
+
+    if (tableName === 'bot_analytics') {
+        return {
+            where: (filter) => ({
+                first: async () => {
+                    const keys = Object.keys(filter);
+                    const values = Object.values(filter);
+                    const whereClause = keys.map((k, i) => `${k} = $${i + 1}`).join(' AND ');
+                    const res = await pool.query(`SELECT * FROM bot_analytics WHERE ${whereClause} LIMIT 1`, values);
+                    return res.rows[0] || null;
+                },
+                update: async (updateObj) => {
+                    const filterKeys = Object.keys(filter);
+                    const filterValues = Object.values(filter);
+                    const updateKeys = Object.keys(updateObj);
+                    const updateValues = Object.values(updateObj);
+                    const setClause = updateKeys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+                    const whereClause = filterKeys.map((k, i) => `${k} = $${updateKeys.length + i + 1}`).join(' AND ');
+                    const res = await pool.query(`UPDATE bot_analytics SET ${setClause} WHERE ${whereClause}`, [...updateValues, ...filterValues]);
+                    return res.rowCount;
+                }
+            }),
+            select: async () => {
+                const res = await pool.query(`SELECT * FROM bot_analytics`);
+                return res.rows;
+            },
+            insert: async (newRecord) => {
+                const keys = Object.keys(newRecord);
+                const values = Object.values(newRecord);
+                const cols = keys.join(', ');
+                const params = keys.map((_, i) => `$${i + 1}`).join(', ');
+                const updateSets = keys.map(k => `${k} = EXCLUDED.${k}`).join(', ');
+                const res = await pool.query(`
+                    INSERT INTO bot_analytics (${cols}) VALUES (${params}) 
+                    ON CONFLICT (key) DO UPDATE SET ${updateSets}
                     RETURNING *
                 `, values);
                 return res.rows;

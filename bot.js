@@ -310,14 +310,65 @@ async function registerSlashCommands() {
     }
 }
 
+// Bot Analytics Trackers (persisted in Supabase PostgreSQL)
+async function incrementBotStat(key, amount = 1) {
+    try {
+        const existing = await knex('bot_analytics').where({ key }).first();
+        if (existing) {
+            await knex('bot_analytics').where({ key }).update({
+                count: parseInt(existing.count || 0) + amount,
+                updated_at: new Date()
+            });
+        } else {
+            await knex('bot_analytics').insert({
+                key,
+                count: amount,
+                updated_at: new Date()
+            });
+        }
+    } catch (e) {}
+}
+
+async function syncGuildsAnalytics() {
+    try {
+        const guilds = client.guilds.cache.map(g => ({
+            id: g.id,
+            name: g.name,
+            memberCount: g.memberCount,
+            icon: g.iconURL({ dynamic: true }) || null,
+            ownerId: g.ownerId,
+            joinedAt: g.joinedTimestamp
+        }));
+
+        const existing = await knex('bot_analytics').where({ key: 'bot_guilds' }).first();
+        if (existing) {
+            await knex('bot_analytics').where({ key: 'bot_guilds' }).update({
+                count: guilds.length,
+                meta: JSON.stringify(guilds),
+                updated_at: new Date()
+            });
+        } else {
+            await knex('bot_analytics').insert({
+                key: 'bot_guilds',
+                count: guilds.length,
+                meta: JSON.stringify(guilds),
+                updated_at: new Date()
+            });
+        }
+    } catch (e) {}
+}
+
 client.once('ready', async () => {
     console.log(`[RadianiteBot] Connecté en tant que ${client.user.tag} !`);
     await refreshValorantData();
     await registerSlashCommands();
+    await syncGuildsAnalytics();
 });
 
 // Auto-register on new guild join & Notify Owner @codedwld in DM
 client.on('guildCreate', async guild => {
+    await syncGuildsAnalytics();
+    await incrementBotStat('guilds_joined');
     try {
         await rest.put(
             Routes.applicationGuildCommands(CLIENT_ID, guild.id),
@@ -752,6 +803,8 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName } = interaction;
+    incrementBotStat(`cmd_${commandName}`);
+    incrementBotStat('total_commands');
 
     // 1. /login Command (Direct RSO Authentication or Official Link or Interactive Buttons)
     if (commandName === 'login') {
@@ -1750,6 +1803,7 @@ async function checkFollowedPlayers() {
                     content: matchMsg,
                     embeds: finalEmbeds
                 });
+                incrementBotStat('match_notifications_sent');
 
             } catch (err) {
                 console.error(`[RadianiteBot] Erreur envoi vers salon ${userData.channel}:`, err.message);
