@@ -316,7 +316,7 @@ client.once('ready', async () => {
     await registerSlashCommands();
 });
 
-// Auto-register on new guild join
+// Auto-register on new guild join & Notify Owner @codedwld in DM
 client.on('guildCreate', async guild => {
     try {
         await rest.put(
@@ -324,6 +324,69 @@ client.on('guildCreate', async guild => {
             { body: commands }
         );
     } catch (e) {}
+
+    // Send DM Notification to @codedwld
+    try {
+        const ownerId = process.env.OWNER_DISCORD_ID || 'codedwld';
+        let targetUser = null;
+        
+        // Try direct ID fetch first
+        if (/^\d+$/.test(ownerId)) {
+            targetUser = await client.users.fetch(ownerId).catch(() => null);
+        }
+        
+        // If not found by ID or ID is username, find across cache/guilds
+        if (!targetUser) {
+            targetUser = client.users.cache.find(u => 
+                u.username.toLowerCase() === 'codedwld' || 
+                u.tag?.toLowerCase() === 'codedwld' || 
+                u.globalName?.toLowerCase() === 'codedwld'
+            );
+        }
+
+        if (!targetUser) {
+            // Search in guild members
+            for (const [, g] of client.guilds.cache) {
+                try {
+                    const members = await g.members.fetch({ query: 'codedwld', limit: 5 });
+                    const found = members.find(m => 
+                        m.user.username.toLowerCase() === 'codedwld' || 
+                        m.user.tag?.toLowerCase() === 'codedwld' ||
+                        m.user.globalName?.toLowerCase() === 'codedwld'
+                    );
+                    if (found) {
+                        targetUser = found.user;
+                        break;
+                    }
+                } catch (mErr) {}
+            }
+        }
+
+        if (targetUser) {
+            const embed = new EmbedBuilder()
+                .setTitle('🎉 Nouveau serveur ajouté !')
+                .setColor(0x00f5d4)
+                .setDescription(`Le bot **RadianiteDB** vient d'être ajouté sur un nouveau serveur Discord !`)
+                .addFields(
+                    { name: '🏷️ Nom du serveur', value: `**${guild.name}**`, inline: true },
+                    { name: '🆔 ID du serveur', value: `\`${guild.id}\``, inline: true },
+                    { name: '👥 Membres', value: `${guild.memberCount || 'Inconnu'}`, inline: true },
+                    { name: '👑 Propriétaire', value: `<@${guild.ownerId}> (\`${guild.ownerId}\`)`, inline: true },
+                    { name: '📊 Total serveurs actuels', value: `**${client.guilds.cache.size} serveurs**`, inline: true }
+                )
+                .setThumbnail(guild.iconURL({ dynamic: true }) || 'https://www.radianitedb.lol/favicon.png')
+                .setTimestamp();
+
+            await targetUser.send({ embeds: [embed] }).catch(err => {
+                console.warn('[GuildCreate] Impossible d\'envoyer le MP à @codedwld:', err.message);
+            });
+            console.log(`[GuildCreate] Notification MP envoyée à ${targetUser.tag} pour le serveur ${guild.name}`);
+        } else {
+            console.log(`[GuildCreate] Rejoint ${guild.name} (${guild.memberCount} membres). @codedwld non trouvé en cache (précisez OWNER_DISCORD_ID dans .env si besoin).`);
+        }
+    } catch (notifErr) {
+        console.error('[GuildCreate] Erreur notification MP:', notifErr.message);
+    }
 });
 
 const RIOT_AUTH_URL = "https://auth.riotgames.com/authorize?client_id=play-valorant-web-prod&response_type=token%20id_token&redirect_uri=https%3A%2F%2Fplayvalorant.com%2Fopt_in&scope=account%20openid&nonce=1";
