@@ -11,6 +11,20 @@ if (process.env.DATABASE_URL) {
     });
 }
 
+async function initDatabase() {
+    if (!pool) return;
+    try {
+        await pool.query(`
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS riot_auth TEXT;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'en';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS show_rank_wheel BOOLEAN DEFAULT true;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_mentions BOOLEAN DEFAULT true;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_rankup_only BOOLEAN DEFAULT false;
+        `);
+    } catch (err) {}
+}
+initDatabase();
+
 function knex(tableName) {
     if (!pool) {
         return {
@@ -55,7 +69,12 @@ function knex(tableName) {
                 const values = Object.values(newRecord);
                 const cols = keys.join(', ');
                 const params = keys.map((_, i) => `$${i + 1}`).join(', ');
-                const res = await pool.query(`INSERT INTO users (${cols}) VALUES (${params}) RETURNING *`, values);
+                const updateSets = keys.map(k => `${k} = EXCLUDED.${k}`).join(', ');
+                const res = await pool.query(`
+                    INSERT INTO users (${cols}) VALUES (${params}) 
+                    ON CONFLICT (discord_id) DO UPDATE SET ${updateSets}
+                    RETURNING *
+                `, values);
                 return res.rows;
             }
         };
