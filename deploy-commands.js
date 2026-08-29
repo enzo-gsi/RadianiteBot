@@ -137,8 +137,8 @@ const commands = [
         ]
     },
     {
-        name: 'classement',
-        description: 'Classement compétitif du serveur Discord (Top RR, Rangs, K/D).',
+        name: 'leaderboard',
+        description: 'Server competitive leaderboard (Top RR, Tiers, K/D).',
     },
     {
         name: 'session',
