@@ -176,6 +176,73 @@ const commands = [
     {
         name: 'setchannel',
         description: 'Définir ce salon textuel pour les alertes de fin de match.',
+    },
+    {
+        name: 'wishlist',
+        description: 'Gérer vos skins souhaités (alertes MP automatiques lors des rotations de boutique).',
+        options: [
+            {
+                name: 'ajouter',
+                description: 'Ajouter un skin à surveiller dans votre boutique quotidienne.',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Nom du skin d\'arme Valorant à surveiller',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'retirer',
+                description: 'Retirer un skin de votre liste de surveillance.',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Nom du skin à retirer de votre liste',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'liste',
+                description: 'Afficher tous vos skins actuellement surveillés.',
+                type: ApplicationCommandOptionType.Subcommand
+            }
+        ]
+    },
+    {
+        name: 'scout',
+        description: 'Analyser en direct le lobby et les rangs/stats des adversaires.',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
+    },
+    {
+        name: 'classement',
+        description: 'Classement compétitif du serveur Discord (Top RR, Rangs, K/D).',
+    },
+    {
+        name: 'session',
+        description: 'Rapport de performance des parties jouées sur les dernières 24h.',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
     }
 ];
 
@@ -698,6 +765,282 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({ content: 'Une erreur est survenue lors de la configuration du salon.', ephemeral: true });
         }
     }
+
+    // 6. /wishlist Command (Subcommands: ajouter, retirer, liste)
+    if (commandName === 'wishlist') {
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === 'ajouter') {
+            await interaction.deferReply({ ephemeral: true });
+            const skinName = interaction.options.getString('skin');
+            const foundSkin = Object.values(valorantWeaponMap).find(s => s.displayName?.toLowerCase() === skinName.toLowerCase())
+                           || Object.values(valorantSkinLevelMap).find(s => s.displayName?.toLowerCase() === skinName.toLowerCase());
+
+            const skinUuid = foundSkin?.uuid || skinName;
+            const finalName = foundSkin?.displayName || skinName;
+
+            await knex('wishlist').insert({
+                discord_id: interaction.user.id,
+                skin_uuid: skinUuid,
+                skin_name: finalName
+            });
+
+            const embed = new EmbedBuilder()
+                .setTitle('⭐ SKIN AJOUTÉ À VOTRE WISHLIST !')
+                .setColor(0x00f5d4)
+                .setDescription(
+                    `✨ **${finalName}** est désormais sous surveillance !\n\n` +
+                    `🔔 Dès que ce skin apparaîtra dans votre boutique quotidienne (à 02h00), vous recevrez automatiquement **une alerte en message privé (MP)** !`
+                );
+
+            if (foundSkin?.displayIcon) {
+                embed.setImage(foundSkin.displayIcon);
+            }
+
+            return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (sub === 'retirer') {
+            await interaction.deferReply({ ephemeral: true });
+            const skinName = interaction.options.getString('skin');
+            await knex('wishlist').where({ discord_id: interaction.user.id, skin_name: skinName }).del();
+
+            return interaction.editReply({
+                content: `🗑️ Le skin **${skinName}** a été retiré de votre liste de surveillance.`
+            });
+        }
+
+        if (sub === 'liste') {
+            await interaction.deferReply({ ephemeral: true });
+            const userWishes = await knex('wishlist').where({ discord_id: interaction.user.id }).select();
+
+            if (userWishes.length === 0) {
+                return interaction.editReply({
+                    content: `📋 **Votre wishlist est vide.**\nUtilisez **/wishlist ajouter skin: ...** pour ajouter vos skins de rêve et recevoir une alerte automatique !`
+                });
+            }
+
+            const listEmbed = new EmbedBuilder()
+                .setTitle(`⭐ VOS SKINS SURVEILLÉS (${userWishes.length})`)
+                .setColor(0x00f5d4)
+                .setDescription(
+                    userWishes.map((w, i) => `**${i + 1}.** ${w.skin_name}`).join('\n') +
+                    `\n\n🔔 *Une alerte privée vous sera envoyée dès leur apparition en boutique.*`
+                )
+                .setFooter({ text: 'RadianiteBot • Surveillance Wishlist 24/7' });
+
+            return interaction.editReply({ embeds: [listEmbed] });
+        }
+    }
+
+    // 7. /scout Command (Live Match Intelligence & Scouting)
+    if (commandName === 'scout') {
+        await interaction.deferReply({ ephemeral: false });
+
+        let targetRiotId = interaction.options.getString('joueur');
+
+        if (!targetRiotId) {
+            // Find from user's linked account or first followed player
+            const user = await knex('users').where({ discord_id: interaction.user.id }).first();
+            if (user?.riot_auth) {
+                const s = decryptData(user.riot_auth);
+                if (s?.username && s.username.includes('#')) targetRiotId = s.username;
+            }
+            if (!targetRiotId) {
+                const sub = await knex('followed_players').where({ user_id: user?.id || 0 }).first();
+                if (sub) targetRiotId = sub.riot_id;
+            }
+        }
+
+        if (!targetRiotId || !targetRiotId.includes('#')) {
+            return interaction.editReply({
+                content: `❌ **Veuillez préciser un joueur à analyser :** \`/scout joueur: Pseudo#TAG\``
+            });
+        }
+
+        const [name, tag] = targetRiotId.split('#');
+
+        try {
+            const [mmrRes, matchesRes] = await Promise.all([
+                henrikApi.get(`/valorant/v2/mmr/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null),
+                henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=5`).catch(() => null)
+            ]);
+
+            const mmrData = mmrRes?.data?.data?.current_data || {};
+            const highestTier = mmrRes?.data?.data?.highest_rank?.patched_tier || 'Inconnu';
+            const currentTier = mmrData.currenttierpatched || 'Non-classé';
+            const currentRR = mmrData.ranking_in_tier || 0;
+            const elo = mmrData.elo || 0;
+
+            const matches = matchesRes?.data?.data || [];
+            let wins = 0;
+            let totalKills = 0, totalDeaths = 0;
+            const agentCounts = {};
+
+            matches.forEach(m => {
+                const allP = m.players?.all_players || [];
+                const p = allP.find(x => x.name.toLowerCase() === name.toLowerCase());
+                if (p) {
+                    const team = m.teams?.[p.team?.toLowerCase()];
+                    if (team?.has_won) wins++;
+                    totalKills += p.stats?.kills || 0;
+                    totalDeaths += p.stats?.deaths || 0;
+                    const char = p.character || 'Inconnu';
+                    agentCounts[char] = (agentCounts[char] || 0) + 1;
+                }
+            });
+
+            const topAgent = Object.entries(agentCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Inconnu';
+            const recentKD = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills;
+            const winrate = matches.length > 0 ? Math.round((wins / matches.length) * 100) : 0;
+
+            const scoutEmbed = new EmbedBuilder()
+                .setTitle(`🕵️ DOSSIER TACTIQUE & SCOUTING • ${targetRiotId.toUpperCase()}`)
+                .setColor(0x00f5d4)
+                .setDescription(
+                    `🏆 **Rang Actuel :** **${currentTier}** (${currentRR} RR • ELO ${elo})\n` +
+                    `👑 **Peak Rank :** **${highestTier}**\n` +
+                    `────────────────────────────────────────\n` +
+                    `📊 **Performance sur les 5 derniers matchs :**\n` +
+                    `⚔️ **K/D Moyen :** **${recentKD}** (${totalKills} Kills / ${totalDeaths} Morts)\n` +
+                    `🎯 **Winrate Récent :** **${winrate}%** (${wins}V - ${matches.length - wins}D)\n` +
+                    `⭐ **Agent Préféré :** **${topAgent}**\n` +
+                    `────────────────────────────────────────\n` +
+                    `🔗 [Consulter le profil complet sur RadianiteDB](${YOUR_WEBSITE_URL}/#tracker)`
+                )
+                .setThumbnail(mmrData.images?.small || 'https://media.valorant-api.com/competitivetiers/03621f52-4cd8-5eab-4e5e-a4b5d63f9157/24/smallicon.png')
+                .setFooter({ text: 'RadianiteDB Intelligence Suite' })
+                .setTimestamp();
+
+            return interaction.editReply({ embeds: [scoutEmbed] });
+
+        } catch (err) {
+            console.error('[RadianiteBot] Erreur /scout:', err.message);
+            return interaction.editReply({
+                content: `❌ Impossible de récupérer les données tactiques pour **${targetRiotId}**.`
+            });
+        }
+    }
+
+    // 8. /classement Command (Server / Followed Players Leaderboard)
+    if (commandName === 'classement') {
+        await interaction.deferReply({ ephemeral: false });
+
+        try {
+            const followed = await knex('followed_players').select();
+            const uniqueRiotIds = [...new Set(followed.map(f => f.riot_id))];
+
+            if (uniqueRiotIds.length === 0) {
+                return interaction.editReply({
+                    content: `🏆 Aucun joueur surveillé n'est encore enregistré dans la base de données.`
+                });
+            }
+
+            const leaderboardList = [];
+
+            for (const riotId of uniqueRiotIds.slice(0, 10)) {
+                const [name, tag] = riotId.split('#');
+                if (!name || !tag) continue;
+                try {
+                    const mmrRes = await henrikApi.get(`/valorant/v2/mmr/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null);
+                    const currentData = mmrRes?.data?.data?.current_data;
+                    if (currentData) {
+                        leaderboardList.push({
+                            riotId,
+                            tierName: currentData.currenttierpatched || 'Unrated',
+                            tier: currentData.currenttier || 0,
+                            rr: currentData.ranking_in_tier || 0,
+                            elo: currentData.elo || 0
+                        });
+                    }
+                } catch (e) {}
+            }
+
+            leaderboardList.sort((a, b) => b.elo - a.elo);
+
+            const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+
+            const lbEmbed = new EmbedBuilder()
+                .setTitle(`🏆 CLASSEMENT COMPÉTITIF DU SERVEUR`)
+                .setColor(0xffb703)
+                .setDescription(
+                    `Classement des joueurs suivis ordonné par **Rang & RR** :\n\n` +
+                    leaderboardList.map((p, idx) => {
+                        const medal = medals[idx] || '▫️';
+                        return `${medal} **${idx + 1}. ${p.riotId}** — **${p.tierName}** (${p.rr} RR)`;
+                    }).join('\n\n') +
+                    `\n\n────────────────────────────────────────\n` +
+                    `🌐 *Mis à jour en temps réel via l'API officielle.*`
+                )
+                .setThumbnail('https://media.valorant-api.com/competitivetiers/03621f52-4cd8-5eab-4e5e-a4b5d63f9157/27/smallicon.png')
+                .setTimestamp();
+
+            return interaction.editReply({ embeds: [lbEmbed] });
+
+        } catch (err) {
+            console.error('[RadianiteBot] Erreur /classement:', err);
+            return interaction.editReply({ content: `❌ Erreur lors du calcul du classement.` });
+        }
+    }
+
+    // 9. /session Command (Past 24h Session Summary)
+    if (commandName === 'session') {
+        await interaction.deferReply({ ephemeral: false });
+
+        let targetRiotId = interaction.options.getString('joueur');
+
+        if (!targetRiotId) {
+            const user = await knex('users').where({ discord_id: interaction.user.id }).first();
+            if (user?.riot_auth) {
+                const s = decryptData(user.riot_auth);
+                if (s?.username && s.username.includes('#')) targetRiotId = s.username;
+            }
+            if (!targetRiotId) {
+                const sub = await knex('followed_players').where({ user_id: user?.id || 0 }).first();
+                if (sub) targetRiotId = sub.riot_id;
+            }
+        }
+
+        if (!targetRiotId || !targetRiotId.includes('#')) {
+            return interaction.editReply({
+                content: `❌ **Veuillez préciser un joueur :** \`/session joueur: Pseudo#TAG\``
+            });
+        }
+
+        const report = await generateSessionReport(targetRiotId);
+        if (!report) {
+            return interaction.editReply({
+                content: `ℹ️ **Aucune partie jouée sur les dernières 24h pour ${targetRiotId}.**`
+            });
+        }
+
+        return interaction.editReply({ embeds: [report] });
+    }
+});
+
+// Autocomplete Interaction Handler for Wishlist
+client.on('interactionCreate', async interaction => {
+    if (interaction.isAutocomplete() && interaction.commandName === 'wishlist') {
+        const focusedOption = interaction.options.getFocused(true);
+        const focusedValue = (focusedOption.value || '').toLowerCase();
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === 'retirer') {
+            const userWishes = await knex('wishlist').where({ discord_id: interaction.user.id }).select();
+            const filtered = userWishes
+                .filter(w => w.skin_name.toLowerCase().includes(focusedValue))
+                .slice(0, 25)
+                .map(w => ({ name: w.skin_name, value: w.skin_name }));
+            return interaction.respond(filtered);
+        } else {
+            const allSkins = Object.values(valorantWeaponMap)
+                .filter(s => s.displayName && !s.displayName.toLowerCase().includes('standard') && !s.displayName.toLowerCase().includes('aléatoire'))
+                .filter(s => s.displayName.toLowerCase().includes(focusedValue))
+                .slice(0, 25)
+                .map(s => ({ name: s.displayName, value: s.displayName }));
+            return interaction.respond(allSkins);
+        }
+    }
 });
 
 // Sleep helper to prevent API rate-limits
@@ -980,7 +1323,176 @@ async function checkFollowedPlayers() {
     console.log('[RadianiteBot] Vérification des matchs terminée avec succès.');
 }
 
-// Check every 3 minutes
+// --- HELPER: GENERATE 24H SESSION REPORT ---
+async function generateSessionReport(riotId) {
+    const [name, tag] = riotId.split('#');
+    if (!name || !tag) return null;
+
+    try {
+        const res = await henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=15`).catch(() => null);
+        const allMatches = res?.data?.data || [];
+        const past24hCutoff = Math.floor(Date.now() / 1000) - 86400;
+
+        const sessionMatches = allMatches.filter(m => (m.metadata?.game_start || 0) >= past24hCutoff);
+        if (sessionMatches.length === 0) return null;
+
+        let wins = 0;
+        let totalKills = 0, totalDeaths = 0, totalAssists = 0;
+        let totalScore = 0, totalRounds = 0;
+        let headshots = 0, bodyshots = 0, legshots = 0;
+        const agentStats = {};
+
+        sessionMatches.forEach(m => {
+            const players = m.players?.all_players || [];
+            const p = players.find(x => x.name.toLowerCase() === name.toLowerCase());
+            if (p) {
+                const team = m.teams?.[p.team?.toLowerCase()];
+                if (team?.has_won) wins++;
+                totalKills += p.stats?.kills || 0;
+                totalDeaths += p.stats?.deaths || 0;
+                totalAssists += p.stats?.assists || 0;
+                totalScore += p.stats?.score || 0;
+                totalRounds += m.metadata?.rounds_played || 1;
+                headshots += p.stats?.headshots || 0;
+                bodyshots += p.stats?.bodyshots || 0;
+                legshots += p.stats?.legshots || 0;
+
+                const char = p.character || 'Inconnu';
+                if (!agentStats[char]) agentStats[char] = { played: 0, wins: 0 };
+                agentStats[char].played++;
+                if (team?.has_won) agentStats[char].wins++;
+            }
+        });
+
+        const totalGames = sessionMatches.length;
+        const losses = totalGames - wins;
+        const winrate = Math.round((wins / totalGames) * 100);
+        const kd = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills;
+        const acs = totalRounds > 0 ? Math.round(totalScore / totalRounds) : 0;
+        const totalShots = headshots + bodyshots + legshots;
+        const hsPercent = totalShots > 0 ? Math.round((headshots / totalShots) * 100) : 0;
+
+        const sortedAgents = Object.entries(agentStats).sort((a, b) => b[1].played - a[1].played);
+        const bestAgentName = sortedAgents[0]?.[0] || 'Inconnu';
+        const bestAgentInfo = sortedAgents[0]?.[1] || { played: 0, wins: 0 };
+
+        const embed = new EmbedBuilder()
+            .setTitle(`☀️ RAPPORT DE SESSION • ${riotId.toUpperCase()}`)
+            .setColor(winrate >= 50 ? 0x00f5d4 : 0xff4655)
+            .setDescription(
+                `📊 **Bilan des dernières 24 heures :**\n\n` +
+                `🎮 **Parties jouées :** **${totalGames}** (${wins}V - ${losses}D • **${winrate}% Winrate**)\n` +
+                `⚔️ **Ratio K/D :** **${kd}** (${totalKills} Kills / ${totalDeaths} Morts / ${totalAssists} Assists)\n` +
+                `💥 **ACS Moyen :** **${acs}** | 🎯 **Précision Tête :** **${hsPercent}%**\n` +
+                `⭐ **Agent Principal :** **${bestAgentName}** (${bestAgentInfo.played} parties • ${Math.round((bestAgentInfo.wins / bestAgentInfo.played) * 100)}% Winrate)\n` +
+                `────────────────────────────────────────\n` +
+                `🔗 [Détails complets sur RadianiteDB](${YOUR_WEBSITE_URL}/#tracker)`
+            )
+            .setThumbnail(AGENT_ASSETS[bestAgentName.toLowerCase()] || 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
+            .setFooter({ text: 'RadianiteBot • Briefing de Session Quotidien' })
+            .setTimestamp();
+
+        return embed;
+    } catch (err) {
+        console.error(`[RadianiteBot] Erreur rapport de session pour ${riotId}:`, err.message);
+        return null;
+    }
+}
+
+// --- CRON: DAILY 10h00 SESSION REPORT ---
+async function sendDailySessionRecap() {
+    console.log('[RadianiteBot] ⏰ Envoi automatique des rapports de session de 10h00...');
+    try {
+        const subscriptions = await knex('followed_players')
+            .join('users', 'users.id', 'followed_players.user_id')
+            .whereNotNull('users.discord_channel_id')
+            .select('followed_players.riot_id', 'users.discord_channel_id', 'users.discord_id');
+
+        for (const sub of subscriptions) {
+            try {
+                const report = await generateSessionReport(sub.riot_id);
+                if (report) {
+                    const channel = await client.channels.fetch(sub.discord_channel_id);
+                    if (channel) {
+                        await channel.send({
+                            content: `☀️ <@${sub.discord_id}>, voici votre **briefing de session Valorant** des dernières 24h pour **${sub.riot_id}** :`,
+                            embeds: [report]
+                        });
+                    }
+                }
+            } catch (err) {
+                console.warn(`[RadianiteBot] Erreur envoi session pour ${sub.riot_id}:`, err.message);
+            }
+            await sleep(2000);
+        }
+    } catch (err) {
+        console.error('[RadianiteBot] Erreur globale cron 10h:', err);
+    }
+}
+
+// --- CRON: DAILY 02h05 WISHLIST CHECKER & DM ALERTS ---
+async function checkWishlists() {
+    console.log('[RadianiteBot] ⭐ Vérification des Wishlists skins en cours...');
+    try {
+        const users = await knex('users').whereNotNull('riot_auth').select('discord_id', 'riot_auth');
+        for (const u of users) {
+            try {
+                const wishes = await knex('wishlist').where({ discord_id: u.discord_id }).select();
+                if (wishes.length === 0) continue;
+
+                const session = decryptData(u.riot_auth);
+                if (!session) continue;
+
+                const storeResult = await fetchStorefront(session, cachedRiotVersion);
+                const dailyOffers = storeResult.store?.SkinsPanelLayout?.SingleItemOffers || [];
+
+                for (const wish of wishes) {
+                    const matchedUuid = dailyOffers.find(uuid => {
+                        const skin = valorantSkinLevelMap[uuid] || valorantWeaponMap[uuid];
+                        return uuid === wish.skin_uuid || (skin && skin.displayName?.toLowerCase() === wish.skin_name.toLowerCase());
+                    });
+
+                    if (matchedUuid) {
+                        const skinInfo = valorantSkinLevelMap[matchedUuid] || valorantWeaponMap[matchedUuid] || { displayName: wish.skin_name };
+                        const discordUser = await client.users.fetch(u.discord_id).catch(() => null);
+
+                        if (discordUser) {
+                            const alertEmbed = new EmbedBuilder()
+                                .setTitle('🚨 ALERTE WISHLIST • VOTRE SKIN EST EN BOUTIQUE !')
+                                .setColor(0x00f5d4)
+                                .setDescription(
+                                    `🎉 Bonne nouvelle ! Le skin **${skinInfo.displayName}** est disponible dans votre boutique Valorant aujourd'hui !\n\n` +
+                                    `💵 **Prix :** 1,775 VP\n` +
+                                    `⏱️ **Attention :** Il disparaîtra lors de la prochaine rotation quotidienne à 02h00.\n\n` +
+                                    `👉 Tapez **/boutique** sur Discord pour voir l'ensemble de vos offres du jour !`
+                                )
+                                .setImage(skinInfo.displayIcon || null)
+                                .setThumbnail('https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
+                                .setTimestamp();
+
+                            await discordUser.send({ embeds: [alertEmbed] }).catch(() => {
+                                console.log(`[Wishlist] Impossible d'envoyer un MP à ${u.discord_id} (DMs fermés).`);
+                            });
+                        }
+                    }
+                }
+            } catch (uErr) {
+                console.warn(`[Wishlist] Notice utilisateur ${u.discord_id}:`, uErr.message);
+            }
+            await sleep(3000);
+        }
+    } catch (err) {
+        console.error('[RadianiteBot] Erreur globale wishlist cron:', err);
+    }
+}
+
+// Check followed players matches every 3 minutes
 cron.schedule('*/3 * * * *', checkFollowedPlayers);
+
+// Check store wishlists at 02h05 CET every day
+cron.schedule('5 2 * * *', checkWishlists);
+
+// Send daily session briefing automatically at 10h00 AM every day
+cron.schedule('0 10 * * *', sendDailySessionRecap);
 
 client.login(BOT_TOKEN);

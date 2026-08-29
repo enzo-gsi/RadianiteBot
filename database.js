@@ -20,6 +20,15 @@ async function initDatabase() {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS show_rank_wheel BOOLEAN DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_mentions BOOLEAN DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_rankup_only BOOLEAN DEFAULT false;
+
+            CREATE TABLE IF NOT EXISTS wishlist (
+                id SERIAL PRIMARY KEY,
+                discord_id VARCHAR(64) NOT NULL,
+                skin_uuid VARCHAR(128) NOT NULL,
+                skin_name VARCHAR(128) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(discord_id, skin_uuid)
+            );
         `);
     } catch (err) {}
 }
@@ -155,8 +164,53 @@ function knex(tableName) {
         };
     }
 
+    if (tableName === 'wishlist') {
+        return {
+            where: (filter) => ({
+                first: async () => {
+                    const keys = Object.keys(filter);
+                    const values = Object.values(filter);
+                    const whereClause = keys.map((k, i) => `${k} = $${i + 1}`).join(' AND ');
+                    const res = await pool.query(`SELECT * FROM wishlist WHERE ${whereClause} LIMIT 1`, values);
+                    return res.rows[0] || null;
+                },
+                select: async () => {
+                    const keys = Object.keys(filter);
+                    const values = Object.values(filter);
+                    const whereClause = keys.map((k, i) => `${k} = $${i + 1}`).join(' AND ');
+                    const res = await pool.query(`SELECT * FROM wishlist WHERE ${whereClause} ORDER BY created_at DESC`, values);
+                    return res.rows;
+                },
+                del: async () => {
+                    const keys = Object.keys(filter);
+                    const values = Object.values(filter);
+                    const whereClause = keys.map((k, i) => `${k} = $${i + 1}`).join(' AND ');
+                    const res = await pool.query(`DELETE FROM wishlist WHERE ${whereClause}`, values);
+                    return res.rowCount;
+                }
+            }),
+            select: async () => {
+                const res = await pool.query(`SELECT * FROM wishlist`);
+                return res.rows;
+            },
+            insert: async (newRecord) => {
+                const keys = Object.keys(newRecord);
+                const values = Object.values(newRecord);
+                const cols = keys.join(', ');
+                const params = keys.map((_, i) => `$${i + 1}`).join(', ');
+                const res = await pool.query(`
+                    INSERT INTO wishlist (${cols}) VALUES (${params}) 
+                    ON CONFLICT (discord_id, skin_uuid) DO NOTHING
+                    RETURNING *
+                `, values);
+                return res.rows;
+            }
+        };
+    }
+
     return {
         where: () => ({ first: async () => null, select: async () => [], update: async () => 0, del: async () => 0 }),
+        select: async () => [],
         insert: async () => []
     };
 }

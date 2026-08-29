@@ -84,6 +84,73 @@ const commands = [
     {
         name: 'setchannel',
         description: 'Définir ce salon textuel pour les alertes de fin de match.',
+    },
+    {
+        name: 'wishlist',
+        description: 'Gérer vos skins souhaités (alertes MP automatiques lors des rotations de boutique).',
+        options: [
+            {
+                name: 'ajouter',
+                description: 'Ajouter un skin à surveiller dans votre boutique quotidienne.',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Nom du skin d\'arme Valorant à surveiller',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'retirer',
+                description: 'Retirer un skin de votre liste de surveillance.',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Nom du skin à retirer de votre liste',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'liste',
+                description: 'Afficher tous vos skins actuellement surveillés.',
+                type: ApplicationCommandOptionType.Subcommand
+            }
+        ]
+    },
+    {
+        name: 'scout',
+        description: 'Analyser en direct le lobby et les rangs/stats des adversaires.',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
+    },
+    {
+        name: 'classement',
+        description: 'Classement compétitif du serveur Discord (Top RR, Rangs, K/D).',
+    },
+    {
+        name: 'session',
+        description: 'Rapport de performance des parties jouées sur les dernières 24h.',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
     }
 ];
 
