@@ -1374,7 +1374,15 @@ async function checkFollowedPlayers() {
     const subscriptions = await knex('followed_players')
         .join('users', 'users.id', 'followed_players.user_id')
         .whereNotNull('users.discord_channel_id')
-        .select('followed_players.riot_id', 'users.discord_channel_id', 'users.discord_id', 'users.show_rank_wheel');
+        .select(
+            'followed_players.riot_id',
+            'users.discord_channel_id',
+            'users.discord_id',
+            'users.show_rank_wheel',
+            'users.notify_mentions',
+            'users.notify_rankup_only',
+            'users.language'
+        );
 
     if (subscriptions.length === 0) return;
 
@@ -1428,6 +1436,7 @@ async function checkFollowedPlayers() {
                     // RR change & dynamic Rank Wheel are ONLY fetched for Ranked/Competitive
                     let rrChange = null;
                     let rankWheelUrl = null;
+                    let isRankUp = false;
                     if (isCompetitive) {
                         try {
                             const mmrHistRes = await henrikApi.get(`/valorant/v1/mmr-history/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
@@ -1437,6 +1446,7 @@ async function checkFollowedPlayers() {
                             if (matchedEntry) {
                                 const rawChangeNum = matchedEntry.mmr_change_to_last_game || 0;
                                 rrChange = rawChangeNum > 0 ? `+${rawChangeNum} RR` : `${rawChangeNum} RR`;
+                                isRankUp = matchedEntry.ranking_in_tier + rawChangeNum > 100;
                                 const currentRR = matchedEntry.ranking_in_tier ?? 50;
                                 const rankTierNum = matchedEntry.currenttier || 18;
                                 rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?rr=${currentRR}&change=${rawChangeNum}&tier=${rankTierNum}&size=360&t=${Date.now()}`;
@@ -1449,6 +1459,7 @@ async function checkFollowedPlayers() {
                                 if (cData) {
                                     const rawChangeNum = cData.mmr_change_to_last_game || 0;
                                     rrChange = rawChangeNum > 0 ? `+${rawChangeNum} RR` : `${rawChangeNum} RR`;
+                                    isRankUp = cData.ranking_in_tier + rawChangeNum > 100;
                                     const currentRR = cData.ranking_in_tier || 50;
                                     const rankTierNum = cData.currenttier || 18;
                                     rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?rr=${currentRR}&change=${rawChangeNum}&tier=${rankTierNum}&size=360&t=${Date.now()}`;
@@ -1481,6 +1492,7 @@ async function checkFollowedPlayers() {
                         team,
                         rrChange,
                         rankWheelUrl,
+                        isRankUp,
                         isCompetitive,
                         isDeathmatch,
                         modeDisplay,
@@ -1501,14 +1513,16 @@ async function checkFollowedPlayers() {
         await sleep(3000); // 3 seconds between player requests
     }
 
-    // 3. Group by User/Channel and Match ID (DuoQ / TrioQ / 5-Stack grouping)
-    const userSubs = new Map(); // discord_id -> { channel, user, showRankWheel, language, followedRiotIds: [] }
+    // 3. Group by User/Channel and Match ID (DuoQ / TrioQ / 5-STACK grouping)
+    const userSubs = new Map(); // discord_id -> { channel, user, showRankWheel, notifyMentions, notifyRankupOnly, language, followedRiotIds: [] }
     for (const sub of subscriptions) {
         if (!userSubs.has(sub.discord_id)) {
             userSubs.set(sub.discord_id, {
                 channel: sub.discord_channel_id,
                 user: sub.discord_id,
                 showRankWheel: sub.show_rank_wheel !== false,
+                notifyMentions: sub.notify_mentions !== false,
+                notifyRankupOnly: sub.notify_rankup_only === true,
                 language: sub.language || 'en',
                 followedRiotIds: []
             });
@@ -1523,6 +1537,10 @@ async function checkFollowedPlayers() {
         for (const riotId of userData.followedRiotIds) {
             if (latestPlayerMatches.has(riotId)) {
                 const matchData = latestPlayerMatches.get(riotId);
+                
+                // Respect notify_rankup_only
+                if (userData.notifyRankupOnly && (!matchData.isCompetitive || !matchData.isRankUp)) continue;
+                
                 if (!userNewMatches.has(matchData.matchId)) {
                     userNewMatches.set(matchData.matchId, []);
                 }
@@ -1582,8 +1600,6 @@ async function checkFollowedPlayers() {
                     )
                     .setTimestamp(new Date(match.metadata.game_start * 1000));
 
-                // Thumbnail: In Competitive / Ranked, display the dynamic Rank Wheel with RR delta!
-                // In non-ranked modes (Unrated, Spike Rush, Deathmatch), display the Agent icon!
                 if (isCompetitive && first.rankWheelUrl && userData.showRankWheel !== false) {
                     mainEmbed.setThumbnail(first.rankWheelUrl);
                 } else if (first.playerStats?.assets?.agent?.small) {
@@ -1592,7 +1608,6 @@ async function checkFollowedPlayers() {
 
                 const embedsToSend = [mainEmbed];
 
-                // Add each player with their horizontal player card banner delimiter
                 squadPlayers.forEach((pData, idx) => {
                     const p = pData.playerStats;
                     const kills = p.stats?.kills || 0;
@@ -1605,7 +1620,6 @@ async function checkFollowedPlayers() {
                     const hsPercent = totalShots > 0 ? Math.round((p.stats.headshots / totalShots) * 100) : 0;
 
                     if (pData.isDeathmatch) {
-                        // Deathmatch: Score is kills/deaths, placement shown
                         mainEmbed.addFields({
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character}) • ${pData.isDmWin ? (isEn ? '🏆 Top 1 (Victory)' : '🏆 Top 1 (Victoire)') : `Top ${pData.placement}/${match.players?.all_players?.length || 12}`}`,
                             value: `🎯 **Score :** **${kills} Kills / ${deaths} ${isEn ? 'Deaths' : 'Morts'}** (${kd} KD)\n` +
@@ -1614,7 +1628,6 @@ async function checkFollowedPlayers() {
                             inline: false
                         });
                     } else if (pData.isCompetitive) {
-                        // Ranked / Competitive: Includes RR change
                         mainEmbed.addFields({
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character})`,
                             value: `⚔️ **K/D/A :** ${kills}/${deaths}/${assists} (${kd} KD)\n` +
@@ -1624,7 +1637,6 @@ async function checkFollowedPlayers() {
                             inline: false
                         });
                     } else {
-                        // Unrated / Swiftplay / Spike Rush / Other: Pure stats, NO RR change
                         mainEmbed.addFields({
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character})`,
                             value: `⚔️ **K/D/A :** ${kills}/${deaths}/${assists} (${kd} KD)\n` +
@@ -1634,7 +1646,6 @@ async function checkFollowedPlayers() {
                         });
                     }
 
-                    // Horizontal Player Card Banner Embed (Delimiting each player)
                     if (p.assets?.card?.wide || p.assets?.card?.large) {
                         const bannerEmbed = new EmbedBuilder()
                             .setColor(color)
@@ -1644,13 +1655,15 @@ async function checkFollowedPlayers() {
                     }
                 });
 
-                // Limit embeds to 10 max per Discord API specs
                 const finalEmbeds = embedsToSend.slice(0, 10);
 
+                const mentionPrefix = userData.notifyMentions ? `<@${userData.user}>, ` : '';
+                const matchMsg = isEn 
+                    ? `${mentionPrefix}${isSquad ? `your tracked players in **${squadTitle}** finished their match (${modeDisplay})!` : `**${first.riotId}** finished their match (${modeDisplay})!`}`
+                    : `${mentionPrefix}${isSquad ? `vos joueurs suivis en **${squadTitle}** ont terminé leur partie (${modeDisplay}) !` : `**${first.riotId}** a terminé sa partie (${modeDisplay}) !`}`;
+
                 await channel.send({
-                    content: isEn 
-                        ? `<@${userData.user}>, ${isSquad ? `your tracked players in **${squadTitle}** finished their match (${modeDisplay})!` : `**${first.riotId}** finished their match (${modeDisplay})!`}`
-                        : `<@${userData.user}>, ${isSquad ? `vos joueurs suivis en **${squadTitle}** ont terminé leur partie (${modeDisplay}) !` : `**${first.riotId}** a terminé sa partie (${modeDisplay}) !`}`,
+                    content: matchMsg,
                     embeds: finalEmbeds
                 });
 
