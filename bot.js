@@ -95,9 +95,14 @@ const I18N = {
         channel_set: '✓ Notifications channel set to',
         lang_set: '✓ Bot language set to **English**.',
         followed_success: '✓ Now tracking',
-        unfollowed_success: '✓ Stopped tracking',
         no_followed: 'You are not tracking any players yet. Use `/suivre Player#TAG` to add one.',
-        tracking_list: 'Tracked Players List'
+        tracking_list: 'Tracked Players List',
+        squad_report: 'Squad Match Report',
+        squad_match_ended: 'finished their squad match on',
+        duo: 'DUO',
+        trio: 'TRIO',
+        full_stack: '5-STACK',
+        squad: 'SQUAD'
     },
     fr: {
         player_profile: 'Profil du Joueur',
@@ -130,7 +135,13 @@ const I18N = {
         followed_success: '✓ Vous suivez maintenant',
         unfollowed_success: '✓ Vous ne suivez plus',
         no_followed: 'Vous ne suivez aucun joueur pour le moment. Utilisez `/suivre Pseudo#TAG`.',
-        tracking_list: 'Liste des Joueurs Suivis'
+        tracking_list: 'Liste des Joueurs Suivis',
+        squad_report: 'Rapport d\'Escouade',
+        squad_match_ended: 'ont terminé leur partie en escouade sur',
+        duo: 'DUO',
+        trio: 'TRIO',
+        full_stack: '5-STACK',
+        squad: 'ESCOUADE'
     }
 };
 
@@ -556,7 +567,7 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// --- Moteur de Surveillance des Matchs Suivis ---
+// --- Moteur de Surveillance des Matchs Suivis (Duo/Trio/Squad Grouping) ---
 async function checkFollowedPlayers() {
     try {
         const followedList = await knex('followed_players')
@@ -574,7 +585,7 @@ async function checkFollowedPlayers() {
 
         if (!followedList || followedList.length === 0) return;
 
-        // Regrouper par joueur
+        // Regrouper les cibles par riot_id distinct
         const playersMap = {};
         for (const item of followedList) {
             if (!playersMap[item.riot_id]) {
@@ -590,12 +601,14 @@ async function checkFollowedPlayers() {
             });
         }
 
+        const pendingReports = [];
+
+        // 1. Récupérer et analyser les matchs récents pour chaque joueur
         for (const [riotId, targets] of Object.entries(playersMap)) {
             if (!riotId.includes('#')) continue;
             const [name, tag] = riotId.split('#');
 
             try {
-                // 1. Récupérer le dernier match via Henrik API
                 const matchRes = await henrikApi.get(`/valorant/v3/matches/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=1`);
                 
                 if (matchRes.data && matchRes.data.data && matchRes.data.data.length > 0) {
@@ -604,14 +617,12 @@ async function checkFollowedPlayers() {
 
                     if (!latestMatchId) continue;
 
-                    // 2. Vérifier si ce match a déjà été notifié
+                    // Vérifier si déjà notifié
                     const memory = await knex('bot_memory').where({ riot_id: riotId }).first();
-
                     if (memory && memory.last_match_id === latestMatchId) {
-                        continue; // Déjà traité
+                        continue;
                     }
 
-                    // 3. Parser les statistiques du match
                     const playerObj = latestMatch.players?.all_players?.find(
                         p => p.name?.toLowerCase() === name.toLowerCase() && p.tag?.toLowerCase() === tag.toLowerCase()
                     );
@@ -641,7 +652,6 @@ async function checkFollowedPlayers() {
                     const teamData = latestMatch.teams?.[playerTeam] || { rounds_won: 0, rounds_lost: 0, has_won: false };
                     const isWin = teamData.has_won;
 
-                    // Récupérer le changement de RR si disponible
                     let rrChangeStr = null;
                     let rrChangeNum = 0;
                     let currentRRNum = 50;
@@ -666,87 +676,41 @@ async function checkFollowedPlayers() {
                         }
                     } catch (e) {}
 
-                    // Large Rank Wheel URL
-                    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&rankup=${isRankup ? 1 : 0}&size=360&v=3&t=${Date.now()}`;
+                    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&rankup=${isRankup ? 1 : 0}&size=420&v=4&t=${Date.now()}`;
 
-                    // Envoyer aux salons des utilisateurs selon leurs préférences
-                    for (const target of targets) {
-                        try {
-                            if (target.notify_rankup_only && !isRankup) {
-                                continue; 
-                            }
-
-                            const tLang = getT(target.language || 'en');
-                            const channel = await client.channels.fetch(target.channel);
-                            if (!channel) continue;
-
-                            const embedColor = isRankup ? 0xFFE853 : (isWin ? 0x00F5D4 : 0xFF4655);
-                            let resultTitle = isWin 
-                                ? `${tLang.victory} // ${teamData.rounds_won} - ${teamData.rounds_lost}` 
-                                : `${tLang.defeat} // ${teamData.rounds_won} - ${teamData.rounds_lost}`;
-
-                            if (isRankup) {
-                                resultTitle = `${tLang.rank_up_title} ${currentRankStr.toUpperCase()}`;
-                            }
-
-                            const embed = new EmbedBuilder()
-                                .setAuthor({ 
-                                    name: `RadianiteDB • ${tLang.match_report}`, 
-                                    iconURL: LOGO_ICON_URL
-                                })
-                                .setTitle(`${resultTitle} • ${mapName.toUpperCase()}`)
-                                .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
-                                .setColor(embedColor)
-                                .setDescription(isRankup 
-                                    ? `> 👑 **${tLang.rank_up_banner} ${currentRankStr} (${currentRRNum} RR)**`
-                                    : `> ⚔️ **${latestMatch.metadata?.mode || 'Competitive'}** • Score: **${teamData.rounds_won} - ${teamData.rounds_lost}**`
-                                )
-                                .setThumbnail(agentIcon || LOGO_ICON_URL)
-                                .addFields(
-                                    { name: tLang.played_agent, value: `**${agentName}**`, inline: true },
-                                    { name: tLang.kda, value: `**${kills} / ${deaths} / ${assists}**\n(${kd} K/D)`, inline: true },
-                                    { name: tLang.acs_adr, value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
-                                    { name: tLang.precision, value: `**${hsPercent}% HS**\n(${headshots} heads)`, inline: true },
-                                    { name: tLang.current_rank, value: `**${currentRankStr}**\n(${currentRRNum} RR)`, inline: true },
-                                    { name: tLang.mmr_change, value: rrChangeStr ? `**${isRankup ? '★ ' : ''}${rrChangeStr}**` : `*${tLang.updated}*`, inline: true }
-                                );
-
-                            const finalImage = (target.show_rank_wheel !== false && rankWheelUrl) ? rankWheelUrl : mapSplash;
-                            if (finalImage) {
-                                embed.setImage(finalImage);
-                            }
-
-                            embed.setFooter({ text: tLang.footer, iconURL: LOGO_ICON_URL })
-                                 .setTimestamp(new Date((latestMatch.metadata?.game_start || Date.now() / 1000) * 1000));
-
-                            const actionRow = new ActionRowBuilder().addComponents(
-                                new ButtonBuilder()
-                                    .setLabel(tLang.view_full)
-                                    .setStyle(ButtonStyle.Link)
-                                    .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
-                            );
-
-                            const mentionStr = target.notify_mentions ? `<@${target.user}>, ` : '';
-                            const notificationText = isRankup 
-                                ? `🎉 ${mentionStr}**${riotId}** ${tLang.rank_up_msg} **${currentRankStr}** !`
-                                : `🔔 ${mentionStr}**${riotId}** ${tLang.match_ended} **${mapName}** !`;
-
-                            await channel.send({ 
-                                content: notificationText, 
-                                embeds: [embed],
-                                components: [actionRow]
-                            });
-                        } catch (err) {
-                            console.error(`[RadianiteBot] Erreur envoi vers salon ${target.channel}:`, err);
-                        }
-                    }
-
-                    // Enregistrer en mémoire
-                    if (memory) {
-                        await knex('bot_memory').where({ riot_id: riotId }).update({ last_match_id: latestMatchId });
-                    } else {
-                        await knex('bot_memory').insert({ riot_id: riotId, last_match_id: latestMatchId });
-                    }
+                    pendingReports.push({
+                        riotId,
+                        matchId: latestMatchId,
+                        gameStart: latestMatch.metadata?.game_start || Math.floor(Date.now() / 1000),
+                        mode: latestMatch.metadata?.mode || 'Competitive',
+                        mapName,
+                        mapSplash,
+                        teamData,
+                        isWin,
+                        player: {
+                            riotId,
+                            name,
+                            tag,
+                            agentName,
+                            agentIcon,
+                            kills,
+                            deaths,
+                            assists,
+                            kd,
+                            acs,
+                            adr,
+                            hsPercent,
+                            headshots,
+                            currentRankStr,
+                            currentTierNum,
+                            currentRRNum,
+                            rrChangeNum,
+                            rrChangeStr,
+                            isRankup,
+                            rankWheelUrl
+                        },
+                        targets
+                    });
                 }
             } catch (err) {
                 if (err.response && err.response.status === 429) {
@@ -757,6 +721,204 @@ async function checkFollowedPlayers() {
                 }
             }
         }
+
+        if (pendingReports.length === 0) return;
+
+        // 2. Regrouper les rapports par Salon Discord ET par Match ID
+        const channelMap = new Map();
+
+        for (const report of pendingReports) {
+            for (const target of report.targets) {
+                if (target.notify_rankup_only && !report.player.isRankup) {
+                    continue;
+                }
+                const channelId = target.channel;
+                if (!channelMap.has(channelId)) {
+                    channelMap.set(channelId, new Map());
+                }
+                const channelMatches = channelMap.get(channelId);
+                if (!channelMatches.has(report.matchId)) {
+                    channelMatches.set(report.matchId, []);
+                }
+                channelMatches.get(report.matchId).push({
+                    target,
+                    report
+                });
+            }
+        }
+
+        // 3. Envoyer les messages combinés par salon et par match
+        for (const [channelId, matches] of channelMap.entries()) {
+            let channel;
+            try {
+                channel = await client.channels.fetch(channelId);
+            } catch(e) {
+                console.error(`[RadianiteBot] Salon introuvable ${channelId}:`, e.message);
+                continue;
+            }
+            if (!channel) continue;
+
+            for (const [matchId, entries] of matches.entries()) {
+                try {
+                    const uniquePlayers = [];
+                    const seenRiotIds = new Set();
+                    const mentionsSet = new Set();
+                    let lang = 'en';
+
+                    for (const entry of entries) {
+                        lang = entry.target.language || lang;
+                        if (entry.target.notify_mentions && entry.target.user) {
+                            mentionsSet.add(`<@${entry.target.user}>`);
+                        }
+                        if (!seenRiotIds.has(entry.report.riotId)) {
+                            seenRiotIds.add(entry.report.riotId);
+                            uniquePlayers.push(entry.report);
+                        }
+                    }
+
+                    const tLang = getT(lang);
+                    const firstReport = uniquePlayers[0];
+                    const isWin = firstReport.isWin;
+                    const teamData = firstReport.teamData;
+                    const mapName = firstReport.mapName;
+                    const mapSplash = firstReport.mapSplash;
+
+                    // CAS A : PLUSIEURS JOUEURS SUIVIS DANS LA MÊME PARTIE (DuoQ / TrioQ / 5-Stack)
+                    if (uniquePlayers.length > 1) {
+                        const squadCount = uniquePlayers.length;
+                        const squadType = squadCount === 2 ? tLang.duo : (squadCount === 3 ? tLang.trio : (squadCount === 5 ? tLang.full_stack : tLang.squad));
+                        const anyRankup = uniquePlayers.some(p => p.player.isRankup);
+                        const embedColor = anyRankup ? 0xFFE853 : (isWin ? 0x00F5D4 : 0xFF4655);
+
+                        const resultTitle = `${isWin ? tLang.victory : tLang.defeat} // ${teamData.rounds_won} - ${teamData.rounds_lost} • ${mapName.toUpperCase()} (${squadType})`;
+
+                        const embed = new EmbedBuilder()
+                            .setAuthor({
+                                name: `RadianiteDB • ${tLang.squad_report} (${squadType})`,
+                                iconURL: LOGO_ICON_URL
+                            })
+                            .setTitle(resultTitle)
+                            .setURL(`${YOUR_WEBSITE_URL}/?page=leaderboard`)
+                            .setColor(embedColor)
+                            .setDescription(
+                                `⚔️ **${firstReport.mode}** • Score: **${teamData.rounds_won} - ${teamData.rounds_lost}** • **${squadCount} Joueurs**\n` +
+                                (anyRankup ? `> 👑 **RANK UP DÉTECTÉ DANS L'ESCOUADE !**` : '')
+                            );
+
+                        // Ajouter un champ soigné pour chaque joueur de l'escouade
+                        uniquePlayers.forEach(pObj => {
+                            const p = pObj.player;
+                            const rrBadge = p.rrChangeStr ? ` (${p.isRankup ? '★ ' : ''}${p.rrChangeStr})` : '';
+                            embed.addFields({
+                                name: `👤 ${p.riotId} (${p.agentName})`,
+                                value: `**${p.kills}/${p.deaths}/${p.assists}** (${p.kd} K/D) • **${p.acs}** ACS • **${p.hsPercent}%** HS\nRang: **${p.currentRankStr}** (${p.currentRRNum} RR)${rrBadge}`,
+                                inline: false
+                            });
+                        });
+
+                        if (mapSplash) {
+                            embed.setImage(mapSplash);
+                        }
+
+                        embed.setFooter({ text: `${tLang.footer} • Squad Intelligence`, iconURL: LOGO_ICON_URL })
+                             .setTimestamp(new Date(firstReport.gameStart * 1000));
+
+                        const actionRow = new ActionRowBuilder().addComponents(
+                            new ButtonBuilder()
+                                .setLabel(tLang.open_site)
+                                .setStyle(ButtonStyle.Link)
+                                .setURL(YOUR_WEBSITE_URL)
+                        );
+
+                        const mentionStr = mentionsSet.size > 0 ? `${Array.from(mentionsSet).join(' ')} ` : '';
+                        const playerNamesList = uniquePlayers.map(p => `**${p.riotId}**`).join(', ');
+                        const notificationText = `🔥 ${mentionStr}${playerNamesList} ${tLang.squad_match_ended} **${mapName}** !`;
+
+                        await channel.send({
+                            content: notificationText,
+                            embeds: [embed],
+                            components: [actionRow]
+                        });
+                    }
+                    // CAS B : UN SEUL JOUEUR SUIVI DANS CETTE PARTIE
+                    else {
+                        const pReport = firstReport;
+                        const p = pReport.player;
+                        const isRankup = p.isRankup;
+                        const embedColor = isRankup ? 0xFFE853 : (isWin ? 0x00F5D4 : 0xFF4655);
+
+                        let resultTitle = isWin 
+                            ? `${tLang.victory} // ${teamData.rounds_won} - ${teamData.rounds_lost}` 
+                            : `${tLang.defeat} // ${teamData.rounds_won} - ${teamData.rounds_lost}`;
+
+                        if (isRankup) {
+                            resultTitle = `${tLang.rank_up_title} ${p.currentRankStr.toUpperCase()}`;
+                        }
+
+                        const embed = new EmbedBuilder()
+                            .setAuthor({ 
+                                name: `RadianiteDB • ${tLang.match_report}`, 
+                                iconURL: LOGO_ICON_URL
+                            })
+                            .setTitle(`${resultTitle} • ${mapName.toUpperCase()}`)
+                            .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(pReport.riotId)}`)
+                            .setColor(embedColor)
+                            .setDescription(isRankup 
+                                ? `> 👑 **${tLang.rank_up_banner} ${p.currentRankStr} (${p.currentRRNum} RR)**`
+                                : `> ⚔️ **${pReport.mode}** • Score: **${teamData.rounds_won} - ${teamData.rounds_lost}**`
+                            )
+                            .setThumbnail(p.agentIcon || LOGO_ICON_URL)
+                            .addFields(
+                                { name: tLang.played_agent, value: `**${p.agentName}**`, inline: true },
+                                { name: tLang.kda, value: `**${p.kills} / ${p.deaths} / ${p.assists}**\n(${p.kd} K/D)`, inline: true },
+                                { name: tLang.acs_adr, value: `**${p.acs} ACS**\n(${p.adr} ADR)`, inline: true },
+                                { name: tLang.precision, value: `**${p.hsPercent}% HS**\n(${p.headshots} heads)`, inline: true },
+                                { name: tLang.current_rank, value: `**${p.currentRankStr}**\n(${p.currentRRNum} RR)`, inline: true },
+                                { name: tLang.mmr_change, value: p.rrChangeStr ? `**${p.isRankup ? '★ ' : ''}${p.rrChangeStr}**` : `*${tLang.updated}*`, inline: true }
+                            );
+
+                        const finalImage = p.rankWheelUrl || mapSplash;
+                        if (finalImage) {
+                            embed.setImage(finalImage);
+                        }
+
+                        embed.setFooter({ text: tLang.footer, iconURL: LOGO_ICON_URL })
+                             .setTimestamp(new Date(pReport.gameStart * 1000));
+
+                        const actionRow = new ActionRowBuilder().addComponents(
+                            new ButtonBuilder()
+                                .setLabel(tLang.view_full)
+                                .setStyle(ButtonStyle.Link)
+                                .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(pReport.riotId)}`)
+                        );
+
+                        const mentionStr = mentionsSet.size > 0 ? `${Array.from(mentionsSet).join(' ')} ` : '';
+                        const notificationText = isRankup 
+                            ? `🎉 ${mentionStr}**${pReport.riotId}** ${tLang.rank_up_msg} **${p.currentRankStr}** !`
+                            : `🔔 ${mentionStr}**${pReport.riotId}** ${tLang.match_ended} **${mapName}** !`;
+
+                        await channel.send({ 
+                            content: notificationText, 
+                            embeds: [embed],
+                            components: [actionRow]
+                        });
+                    }
+                } catch(err) {
+                    console.error(`[RadianiteBot] Erreur dispatch salon ${channelId} match ${matchId}:`, err);
+                }
+            }
+        }
+
+        // 4. Mettre à jour la mémoire pour tous les joueurs analysés
+        for (const report of pendingReports) {
+            const memory = await knex('bot_memory').where({ riot_id: report.riotId }).first();
+            if (memory) {
+                await knex('bot_memory').where({ riot_id: report.riotId }).update({ last_match_id: report.matchId });
+            } else {
+                await knex('bot_memory').insert({ riot_id: report.riotId, last_match_id: report.matchId });
+            }
+        }
+
     } catch (error) {
         console.error('[RadianiteBot] Erreur générale lors de la vérification :', error);
     }
