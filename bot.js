@@ -246,7 +246,7 @@ const commands = [
     }
 ];
 
-// Register Slash Commands Instantly (Global + All Connected Guilds)
+// Register Slash Commands (Global Only - Cleans up Guild duplicates)
 const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
 
 async function registerSlashCommands() {
@@ -256,21 +256,19 @@ async function registerSlashCommands() {
             Routes.applicationCommands(CLIENT_ID),
             { body: commands }
         );
-        console.log('[RadianiteBot] Commandes globales enregistrées.');
+        console.log('[RadianiteBot] ✅ Commandes globales enregistrées.');
 
-        // Also register directly on each guild to bypass Discord CDN propagation delay!
+        // Nettoyage des anciennes commandes locales de serveur pour éviter les doublons dans l'UI Discord
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             try {
                 await rest.put(
                     Routes.applicationGuildCommands(CLIENT_ID, guildId),
-                    { body: commands }
+                    { body: [] }
                 );
-                console.log(`[RadianiteBot] Commandes enregistrées instantanément sur le serveur ${guildId}.`);
-            } catch (gErr) {
-                console.warn(`[RadianiteBot] Notice enregistrement guild ${guildId}:`, gErr.message);
-            }
+            } catch (gErr) {}
         }
+        console.log('[RadianiteBot] 🧹 Nettoyage des doublons de serveurs terminé.');
     } catch (error) {
         console.error('[RadianiteBot] Erreur enregistrement commandes:', error);
     }
