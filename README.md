@@ -19,15 +19,13 @@
 
 ## ⚡ Fonctionnalités Clés
 
-- **🚨 Alertes de Fin de Match Automatiques** : Analyse en continu toutes les 5 minutes et envoie un rapport de combat complet dès qu'un joueur surveillé termine sa partie.
-- **🎨 Embeds Tactiques d'Élite** :
-  - **Couleurs dynamiques** : Cyan Radiant (`#00F5D4`) en Victoire, Rouge Crimson (`#FF4655`) en Défaite.
-  - **Miniatures d'agents & Bannières de cartes** en haute définition issues de l'API officielle Valorant.
-  - **Grille de télémétrie complète** : Agent joué, K/D/A, ratio K/D, ACS, ADR, précision Headshot (%), Rang actuel et évolution du RR (`▲ +22 RR`).
-  - **Boutons interactifs** reliant directement à la fiche du joueur sur [RadianiteDB](https://radianitedb.lol).
-- **📊 Fiches de Stats Instantanées (`/stats`)** : Obtenez le Combat Rating (Score sur 1000), le K/D, le Winrate, l'ACS et le rang en une seule commande.
-- **☁️ Synchronisation Supabase PostgreSQL** : Relié directement à la base de données cloud de RadianiteDB pour un partage immédiat entre le site web et Discord.
-- **🪶 Architecture Pure JS & Ultra-Légère** : Utilise le driver PostgreSQL natif (`pg`) sans dépendances de compilation natives (`sqlite3` / `node-gyp`), consomme moins de 25 Mo de RAM.
+- **🛒 Boutique Valorant en Direct (`/boutique`, `/store`, `/shop`)** : Affichez vos 4 skins quotidiens, vos soldes réels de VP, RP et Kingdom Credits, ainsi que le Marché Nocturne directement sur Discord !
+- **🔐 Connexion Directe Riot Sécurisée (`/login`, `/2fa`)** : Authentification persistante avec chiffrement **AES-256-GCM** (mot de passe jamais stocké en clair, renouvellement automatique de session).
+- **🚨 Alertes de Fin de Match Groupées (DuoQ / TrioQ / 5-Stack)** : Combine tous les joueurs d'une même partie en un seul rapport épuré avec **bannières horizontales larges** délimitant chaque profil.
+- **🎯 Filtrage Intelligent des Modes** :
+  - **Ranked (Compétitif)** : Affiche les stats complètes et l'évolution précise de RR (`+22 RR`).
+  - **Non-Classé / Véloce / Spike Rush** : Affiche les stats pures et l'avatar de l'agent sans mention de RR ni de roue.
+  - **Match à Mort (Deathmatch)** : Affiche le score en **Kills / Morts** et le classement final (`Top 1 (Victoire)`).
 
 ---
 
@@ -35,12 +33,13 @@
 
 | Commande | Options | Description |
 | :--- | :--- | :--- |
-| **`/stats`** | `joueur: Pseudo#TAG` | Affiche instantanément le dossier tactique complet d'un joueur. |
-| **`/suivis`** | *Aucune* | Liste tous les joueurs actuellement surveillés avec leurs liens et le salon d'alerte. |
-| **`/suivre`** | `joueur: Pseudo#TAG` | Ajoute un joueur à votre liste de surveillance automatique. |
-| **`/neplus-suivre`** | `joueur: Pseudo#TAG` | Retire un joueur de vos notifications. |
-| **`/setchannel`** | `[salon: #salon]` | Définit le salon textuel où le bot doit publier les alertes de match. |
-| **`/aide`** | *Aucune* | Affiche le guide interactif et l'aide aux commandes. |
+| **`/boutique`** | `[lien_ou_token]` | Affiche votre boutique Valorant du jour, vos soldes VP/RP/KC et le Marché Nocturne. |
+| **`/store`** | `[lien_ou_token]` | Alias de `/boutique`. |
+| **`/shop`** | `[lien_ou_token]` | Alias de `/boutique`. |
+| **`/login`** | `identifiant:` `mot_de_passe:` | Connecte votre compte Riot de manière sécurisée (session persistante chiffrée AES-256). |
+| **`/2fa`** | `code:` | Valide le code de double authentification Riot Games reçu par email. |
+| **`/unlink`** | *Aucune* | Supprime définitivement votre session Riot enregistrée sur le bot. |
+| **`/setchannel`** | *Aucune* | Définit le salon textuel où le bot doit publier les alertes de match. |
 
 ---
 

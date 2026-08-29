@@ -1,10 +1,11 @@
 {
   "name": "radianite-discord-bot",
-  "version": "1.0.0",
-  "description": "RadianiteDB Automated Discord Notification Bot",
+  "version": "2.0.0",
+  "description": "RadianiteDB Automated Discord Notification & Storefront Bot",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "deploy": "node deploy-commands.js"
   },
   "dependencies": {
     "axios": "^1.7.2",
