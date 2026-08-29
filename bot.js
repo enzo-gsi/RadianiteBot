@@ -243,6 +243,38 @@ const commands = [
                 required: false
             }
         ]
+    },
+    {
+        name: 'language',
+        description: 'Choisir la langue des messages du bot (Français / English).',
+        options: [
+            {
+                name: 'langue',
+                description: 'Sélectionnez Français ou English',
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: [
+                    { name: '🇫🇷 Français', value: 'fr' },
+                    { name: '🇺🇸 English', value: 'en' }
+                ]
+            }
+        ]
+    },
+    {
+        name: 'langue',
+        description: 'Choisir la langue des messages du bot (Français / English).',
+        options: [
+            {
+                name: 'langue',
+                description: 'Sélectionnez Français ou English',
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: [
+                    { name: '🇫🇷 Français', value: 'fr' },
+                    { name: '🇺🇸 English', value: 'en' }
+                ]
+            }
+        ]
     }
 ];
 
@@ -1103,6 +1135,37 @@ client.on('interactionCreate', async interaction => {
 
         return interaction.editReply({ embeds: [report] });
     }
+
+    // 10. /language or /langue Command
+    if (commandName === 'language' || commandName === 'langue') {
+        const chosenLang = interaction.options.getString('langue') || 'fr';
+        const discord_id = interaction.user.id;
+
+        try {
+            const user = await knex('users').where({ discord_id }).first();
+            if (user) {
+                await knex('users').where({ discord_id }).update({ language: chosenLang });
+            } else {
+                await knex('users').insert({
+                    discord_id,
+                    username: interaction.user.username,
+                    avatar: interaction.user.displayAvatarURL(),
+                    language: chosenLang
+                });
+            }
+
+            const isFr = chosenLang === 'fr';
+            return interaction.reply({
+                content: isFr 
+                    ? `🇫🇷 **Langue définie sur Français !** Vos alertes de match et notifications de salon seront envoyées en français.`
+                    : `🇺🇸 **Language set to English!** Your match alerts and channel notifications will now be sent in English.`,
+                ephemeral: true
+            });
+        } catch (err) {
+            console.error('[RadianiteBot] Erreur /language:', err);
+            return interaction.reply({ content: 'Une erreur est survenue lors de la configuration de la langue.', ephemeral: true });
+        }
+    }
 });
 
 // Autocomplete Interaction Handler for Wishlist
@@ -1270,13 +1333,14 @@ async function checkFollowedPlayers() {
     }
 
     // 3. Group by User/Channel and Match ID (DuoQ / TrioQ / 5-Stack grouping)
-    const userSubs = new Map(); // discord_id -> { channel, user, showRankWheel, followedRiotIds: [] }
+    const userSubs = new Map(); // discord_id -> { channel, user, showRankWheel, language, followedRiotIds: [] }
     for (const sub of subscriptions) {
         if (!userSubs.has(sub.discord_id)) {
             userSubs.set(sub.discord_id, {
                 channel: sub.discord_channel_id,
                 user: sub.discord_id,
                 showRankWheel: sub.show_rank_wheel !== false,
+                language: sub.language || 'en',
                 followedRiotIds: []
             });
         }
@@ -1307,8 +1371,14 @@ async function checkFollowedPlayers() {
                 const match = first.match;
                 const isCompetitive = first.isCompetitive;
                 const isDeathmatch = first.isDeathmatch;
-                const modeDisplay = first.modeDisplay;
                 const team = first.team;
+                const isEn = (userData.language || 'en') === 'en';
+
+                let modeDisplay = first.modeDisplay;
+                if (isCompetitive) modeDisplay = isEn ? 'Competitive' : 'Compétitif';
+                else if (isDeathmatch) modeDisplay = isEn ? 'Deathmatch' : 'Match à Mort';
+                else if (first.match.metadata?.mode?.toLowerCase().includes('swiftplay')) modeDisplay = isEn ? 'Swiftplay' : 'Partie Véloce';
+                else if (first.match.metadata?.mode?.toLowerCase().includes('unrated')) modeDisplay = isEn ? 'Unrated' : 'Non-classé';
 
                 const isSquad = squadPlayers.length > 1;
                 const squadTitle = squadPlayers.length === 2 ? 'DUOQ' : squadPlayers.length === 3 ? 'TRIOQ' : squadPlayers.length === 5 ? '5-STACK' : `${squadPlayers.length}-STACK`;
@@ -1319,13 +1389,14 @@ async function checkFollowedPlayers() {
                 if (isDeathmatch) {
                     const isDmWin = first.isDmWin;
                     color = isDmWin ? 0x00f5d4 : (first.placement <= 3 ? 0xffb703 : 0xff4655);
+                    const winLabel = isEn ? 'VICTORY' : 'VICTOIRE';
                     title = isSquad 
-                        ? `🎯 MATCH À MORT • SQUAD ${squadTitle}`
-                        : `${isDmWin ? '🏆 VICTOIRE' : `💀 TOP ${first.placement}`} (${first.dmScore}) • ${first.riotId}`;
+                        ? (isEn ? `🎯 DEATHMATCH • SQUAD ${squadTitle}` : `🎯 MATCH À MORT • SQUAD ${squadTitle}`)
+                        : `${isDmWin ? `🏆 ${winLabel}` : `💀 TOP ${first.placement}`} (${first.dmScore}) • ${first.riotId}`;
                 } else {
                     const hasWon = team.has_won;
                     color = hasWon ? 0x00f5d4 : 0xff4655;
-                    const resultText = hasWon ? 'VICTOIRE' : 'DÉFAITE';
+                    const resultText = hasWon ? (isEn ? 'VICTORY' : 'VICTOIRE') : (isEn ? 'DEFEAT' : 'DÉFAITE');
                     title = isSquad 
                         ? `🔥 ${resultText} (${team.rounds_won} - ${team.rounds_lost}) • SQUAD ${squadTitle}` 
                         : `⚡ ${resultText} (${team.rounds_won} - ${team.rounds_lost}) • ${first.riotId}`;
@@ -1367,9 +1438,9 @@ async function checkFollowedPlayers() {
                     if (pData.isDeathmatch) {
                         // Deathmatch: Score is kills/deaths, placement shown
                         mainEmbed.addFields({
-                            name: `👤 ${idx + 1}. ${pData.riotId} (${p.character}) • ${pData.isDmWin ? '🏆 Top 1 (Victoire)' : `Top ${pData.placement}/${match.players?.all_players?.length || 12}`}`,
-                            value: `🎯 **Score :** **${kills} Kills / ${deaths} Morts** (${kd} KD)\n` +
-                                   `💥 **Assists :** ${assists} | 🎯 **Tirs Tête :** ${p.stats?.headshots || 0} (${hsPercent}%)\n` +
+                            name: `👤 ${idx + 1}. ${pData.riotId} (${p.character}) • ${pData.isDmWin ? (isEn ? '🏆 Top 1 (Victory)' : '🏆 Top 1 (Victoire)') : `Top ${pData.placement}/${match.players?.all_players?.length || 12}`}`,
+                            value: `🎯 **Score :** **${kills} Kills / ${deaths} ${isEn ? 'Deaths' : 'Morts'}** (${kd} KD)\n` +
+                                   `💥 **Assists :** ${assists} | 🎯 **${isEn ? 'Headshots' : 'Tirs Tête'} :** ${p.stats?.headshots || 0} (${hsPercent}%)\n` +
                                    `────────────────────────────────────────`,
                             inline: false
                         });
@@ -1378,8 +1449,8 @@ async function checkFollowedPlayers() {
                         mainEmbed.addFields({
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character})`,
                             value: `⚔️ **K/D/A :** ${kills}/${deaths}/${assists} (${kd} KD)\n` +
-                                   `💥 **ACS :** ${acs} | 🎯 **HS :** ${hsPercent}%\n` +
-                                   `📈 **Évolution RR :** **${pData.rrChange || '±0 RR'}**\n` +
+                                   `💥 **ACS :** ${acs} | 🎯 **${isEn ? 'Headshot %' : 'Tirs Tête'} :** ${hsPercent}%\n` +
+                                   `📈 **${isEn ? 'RR Change' : 'Évolution RR'} :** **${pData.rrChange || '±0 RR'}**\n` +
                                    `────────────────────────────────────────`,
                             inline: false
                         });
@@ -1388,7 +1459,7 @@ async function checkFollowedPlayers() {
                         mainEmbed.addFields({
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character})`,
                             value: `⚔️ **K/D/A :** ${kills}/${deaths}/${assists} (${kd} KD)\n` +
-                                   `💥 **ACS :** ${acs} | 🎯 **HS :** ${hsPercent}%\n` +
+                                   `💥 **ACS :** ${acs} | 🎯 **${isEn ? 'Headshot %' : 'Tirs Tête'} :** ${hsPercent}%\n` +
                                    `────────────────────────────────────────`,
                             inline: false
                         });
@@ -1399,7 +1470,7 @@ async function checkFollowedPlayers() {
                         const bannerEmbed = new EmbedBuilder()
                             .setColor(color)
                             .setImage(p.assets.card.wide || p.assets.card.large)
-                            .setFooter({ text: `${pData.riotId} • ${p.character} • ${pData.modeDisplay}` });
+                            .setFooter({ text: `${pData.riotId} • ${p.character} • ${modeDisplay}` });
                         embedsToSend.push(bannerEmbed);
                     }
                 });
@@ -1408,7 +1479,9 @@ async function checkFollowedPlayers() {
                 const finalEmbeds = embedsToSend.slice(0, 10);
 
                 await channel.send({
-                    content: `<@${userData.user}>, ${isSquad ? `vos joueurs suivis en **${squadTitle}** ont terminé leur partie (${modeDisplay}) !` : `**${first.riotId}** a terminé sa partie (${modeDisplay}) !`}`,
+                    content: isEn 
+                        ? `<@${userData.user}>, ${isSquad ? `your tracked players in **${squadTitle}** finished their match (${modeDisplay})!` : `**${first.riotId}** finished their match (${modeDisplay})!`}`
+                        : `<@${userData.user}>, ${isSquad ? `vos joueurs suivis en **${squadTitle}** ont terminé leur partie (${modeDisplay}) !` : `**${first.riotId}** a terminé sa partie (${modeDisplay}) !`}`,
                     embeds: finalEmbeds
                 });
 

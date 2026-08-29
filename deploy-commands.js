@@ -151,6 +151,38 @@ const commands = [
                 required: false
             }
         ]
+    },
+    {
+        name: 'language',
+        description: 'Choisir la langue des messages du bot (Français / English).',
+        options: [
+            {
+                name: 'langue',
+                description: 'Sélectionnez Français ou English',
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: [
+                    { name: '🇫🇷 Français', value: 'fr' },
+                    { name: '🇺🇸 English', value: 'en' }
+                ]
+            }
+        ]
+    },
+    {
+        name: 'langue',
+        description: 'Choisir la langue des messages du bot (Français / English).',
+        options: [
+            {
+                name: 'langue',
+                description: 'Sélectionnez Français ou English',
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: [
+                    { name: '🇫🇷 Français', value: 'fr' },
+                    { name: '🇺🇸 English', value: 'en' }
+                ]
+            }
+        ]
     }
 ];
 
