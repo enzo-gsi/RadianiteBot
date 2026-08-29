@@ -275,27 +275,35 @@ client.on('interactionCreate', async interaction => {
 
             const bestAgent = overview.bestAgent || data.analysis?.agents?.best?.name || 'Agent';
             const agentKey = bestAgent.toLowerCase();
-            const tierNum = rInfo.tier || 21;
+            const tierNum = (rInfo.tier !== undefined && rInfo.tier !== null) ? rInfo.tier : 18;
             const rrNum = rInfo.rr || 0;
             const lastChangeNum = rInfo.lastRRChange || 0;
-            const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=320`;
+            const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${tierNum}&rr=${rrNum}&change=${lastChangeNum}&size=360`;
 
             const embed = new EmbedBuilder()
-                .setTitle(`📊 DOSSIER TACTIQUE // ${pInfo.name || rawInput}`)
+                .setAuthor({
+                    name: `RADIANITEDB // DOSSIER JOUEUR TACTIQUE`,
+                    iconURL: 'https://cdn.discordapp.com/emojis/849999088656678912.png'
+                })
+                .setTitle(`${pInfo.name || rawInput} • LVL ${pInfo.level || 1}`)
                 .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(rawInput)}`)
                 .setColor(score >= 600 ? 0x00F5D4 : 0xFF4655)
                 .setThumbnail(rankWheelUrl)
-                .setDescription(`Niveau de compte: **LVL ${pInfo.level || 1}** • Région: **${pInfo.region || 'EU'}**\nCombat Rating: **${score} / 1000** ⚡`)
+                .setDescription(`Région: **${pInfo.region || 'EU'}** • Score Combat: **${score} / 1000** ⚡\n> *Données officielles synchronisées avec Supabase Cloud*`)
                 .addFields(
-                    { name: '🏆 Rang Actuel', value: `**${rankName}**\n${rr} RR`, inline: true },
-                    { name: '⚔️ K/D Ratio', value: `**${kd}**\n(${overview.gameCount || 0} matchs)`, inline: true },
-                    { name: '🔥 Winrate', value: `**${winRate}%**\nVictoires`, inline: true },
-                    { name: '🎯 Score Combat (ACS)', value: `**${acs}** ACS\n(${adr} ADR)`, inline: true },
-                    { name: '🎯 Précision Headshot', value: `**${hs}%** HS\nTirs tête`, inline: true },
-                    { name: '👑 Meilleur Agent', value: `**${bestAgent}**\nSpécialiste`, inline: true }
+                    { name: '◈ Rang Actuel', value: `**${rankName}**\n(${rr} RR)`, inline: true },
+                    { name: '◈ Combat K/D', value: `**${kd} K/D**\n(${overview.gameCount || 0} matchs)`, inline: true },
+                    { name: '◈ Taux de Victoire', value: `**${winRate}% Winrate**\n(${Math.round((winRate/100) * (overview.gameCount || 0))} V)`, inline: true },
+                    { name: '◈ ACS / ADR', value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
+                    { name: '◈ Précision Tirs', value: `**${hs}% Headshot**\nTirs tête`, inline: true },
+                    { name: '◈ Spécialité Agent', value: `**${bestAgent}**\nAgent dominant`, inline: true }
                 )
                 .setFooter({ text: 'RadianiteDB Live Analytics • Données officielles Valorant' })
                 .setTimestamp();
+
+            if (pInfo.bestAgentSplash || pInfo.bestMapSplash) {
+                embed.setImage(pInfo.bestAgentSplash || pInfo.bestMapSplash);
+            }
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -499,8 +507,10 @@ async function checkFollowedPlayers() {
                     let rrChangeStr = null;
                     let rrChangeNum = 0;
                     let currentRRNum = 50;
-                    let currentTierNum = playerObj.currenttier || 21;
+                    let currentTierNum = playerObj.currenttier || 18;
                     let currentRankStr = playerObj.currenttier_patched || 'Classé';
+                    let isRankup = false;
+
                     try {
                         const localStats = await localApi.get(`/api/stats/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
                         if (localStats.data?.rankInfo) {
@@ -510,39 +520,47 @@ async function checkFollowedPlayers() {
                             const ch = localStats.data.rankInfo.lastRRChange;
                             if (ch !== null && ch !== undefined && ch !== 0) {
                                 rrChangeNum = ch;
-                                rrChangeStr = ch > 0 ? `▲ +${ch} RR` : `▼ ${ch} RR`;
+                                rrChangeStr = ch > 0 ? `+${ch} RR` : `${ch} RR`;
+                                // Detection de promotion (Rankup)
+                                if (ch > 0 && currentRRNum < ch) {
+                                    isRankup = true;
+                                }
                             }
                         }
                     } catch (e) {}
 
-                    // Construction de la Roue de Rang Dynamique (Gain Vert / Perte Rouge)
-                    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&size=320`;
+                    // Construction de la Roue de Rang Dynamique (Gain Vert / Perte Rouge / Rankup Or)
+                    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?tier=${currentTierNum}&rr=${currentRRNum}&change=${rrChangeNum}&rankup=${isRankup ? 1 : 0}&size=360`;
 
                     // Construction du somptueux Embed tactique
-                    const embedColor = isWin ? 0x00F5D4 : 0xFF4655; // Cyan éclatant ou Rouge Valorant
-                    const resultTitle = isWin 
-                        ? `🏆 VICTOIRE // ${teamData.rounds_won} - ${teamData.rounds_lost}` 
-                        : `💀 DÉFAITE // ${teamData.rounds_won} - ${teamData.rounds_lost}`;
+                    const embedColor = isRankup ? 0xFFE853 : (isWin ? 0x00F5D4 : 0xFF4655);
+                    let resultTitle = isWin 
+                        ? `VICTOIRE // ${teamData.rounds_won} - ${teamData.rounds_lost}` 
+                        : `DÉFAITE // ${teamData.rounds_won} - ${teamData.rounds_lost}`;
+
+                    if (isRankup) {
+                        resultTitle = `★ RANK UP // PROMOTION EN ${currentRankStr.toUpperCase()}`;
+                    }
 
                     const embed = new EmbedBuilder()
                         .setAuthor({ 
-                            name: `RADIANITEDB // RAPPORT DE COMBAT EN DIRECT`, 
+                            name: `RADIANITEDB // RAPPORT DE MATCH EN DIRECT`, 
                             iconURL: 'https://cdn.discordapp.com/emojis/849999088656678912.png'
                         })
                         .setTitle(`${resultTitle} • ${mapName.toUpperCase()}`)
                         .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
                         .setColor(embedColor)
-                        .setDescription(`Rapport de mission pour **${riotId}** (${(latestMatch.metadata?.mode || 'Competitive').toUpperCase()})`)
+                        .setDescription(`Dossier tactique de fin de partie pour **${riotId}** (${(latestMatch.metadata?.mode || 'Competitive').toUpperCase()})\n${isRankup ? `> 👑 **Félicitations ! Le joueur est monté ${currentRankStr} (${currentRRNum} RR)**` : ''}`)
                         .setThumbnail(rankWheelUrl)
                         .addFields(
-                            { name: '👤 Agent Joué', value: `**${agentName}**`, inline: true },
-                            { name: '⚔️ K / D / A', value: `**${kills} / ${deaths} / ${assists}**\n(${kd} K/D)`, inline: true },
-                            { name: '💥 Score Combat', value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
-                            { name: '🎯 Précision Tirs', value: `**${hsPercent}%** Headshot\n(${headshots} têtes)`, inline: true },
-                            { name: '🏆 Rang Actuel', value: `**${currentRankStr}**`, inline: true },
-                            { name: '📈 Évolution MMR', value: rrChangeStr ? `**${rrChangeStr}**` : `*Actualisé sur le site*`, inline: true }
+                            { name: '◈ Agent Joué', value: `**${agentName}**`, inline: true },
+                            { name: '◈ Combat K / D / A', value: `**${kills} / ${deaths} / ${assists}**\n(${kd} K/D)`, inline: true },
+                            { name: '◈ Score (ACS / ADR)', value: `**${acs} ACS**\n(${adr} ADR)`, inline: true },
+                            { name: '◈ Précision Tirs', value: `**${hsPercent}% Headshot**\n(${headshots} têtes)`, inline: true },
+                            { name: '◈ Rang Actuel', value: `**${currentRankStr}**\n(${currentRRNum} RR)`, inline: true },
+                            { name: '◈ Évolution MMR', value: rrChangeStr ? `**${isRankup ? '★ ' : ''}${rrChangeStr}**` : `*Mis à jour*`, inline: true }
                         )
-                        .setFooter({ text: `RadianiteDB Live Transmission • Partagé avec vos abonnements` })
+                        .setFooter({ text: `RadianiteDB Auto-Tracking • Supabase Cloud PostgreSQL` })
                         .setTimestamp(new Date((latestMatch.metadata?.game_start || Date.now() / 1000) * 1000));
 
                     if (mapSplash) {
@@ -551,7 +569,7 @@ async function checkFollowedPlayers() {
 
                     const actionRow = new ActionRowBuilder().addComponents(
                         new ButtonBuilder()
-                            .setLabel('📊 Consulter le dossier complet sur RadianiteDB')
+                            .setLabel('Consulter le dossier complet sur RadianiteDB')
                             .setStyle(ButtonStyle.Link)
                             .setURL(`${YOUR_WEBSITE_URL}/?search=${encodeURIComponent(riotId)}`)
                     );
@@ -561,8 +579,12 @@ async function checkFollowedPlayers() {
                         try {
                             const channel = await client.channels.fetch(target.channel);
                             if (channel) {
+                                const notificationText = isRankup 
+                                    ? `🎉 <@${target.user}>, **${riotId}** vient de **RANK UP** en **${currentRankStr}** !`
+                                    : `🔔 <@${target.user}>, **${riotId}** a terminé sa partie sur **${mapName}** !`;
+
                                 await channel.send({ 
-                                    content: `🔔 <@${target.user}>, **${riotId}** vient de terminer une partie !`, 
+                                    content: notificationText, 
                                     embeds: [embed],
                                     components: [actionRow]
                                 });
