@@ -1,0 +1,16 @@
+{
+  "name": "radianite-discord-bot",
+  "version": "1.0.0",
+  "description": "RadianiteDB Automated Discord Notification Bot",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "discord.js": "^14.24.2",
+    "dotenv": "^17.4.2",
+    "node-cron": "^4.2.1",
+    "pg": "^8.12.0"
+  }
+}
