@@ -73,6 +73,10 @@ function knex(tableName) {
                     return res.rowCount;
                 }
             }),
+            select: async () => {
+                const res = await pool.query(`SELECT * FROM users`);
+                return res.rows;
+            },
             insert: async (newRecord) => {
                 const keys = Object.keys(newRecord);
                 const values = Object.values(newRecord);
@@ -127,6 +131,10 @@ function knex(tableName) {
                     return res.rowCount;
                 }
             }),
+            select: async () => {
+                const res = await pool.query(`SELECT * FROM followed_players`);
+                return res.rows;
+            },
             insert: async (newRecord) => {
                 const keys = Object.keys(newRecord);
                 const values = Object.values(newRecord);

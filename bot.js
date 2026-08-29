@@ -927,12 +927,28 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply({ ephemeral: false });
 
         try {
-            const followed = await knex('followed_players').select();
-            const uniqueRiotIds = [...new Set(followed.map(f => f.riot_id))];
+            const followed = (await knex('followed_players').select()) || [];
+            const users = (await knex('users').select()) || [];
+            
+            const candidateIds = new Set(followed.map(f => f.riot_id).filter(Boolean));
+            
+            // Also include linked Riot users
+            for (const u of users) {
+                if (u.riot_auth) {
+                    try {
+                        const s = decryptData(u.riot_auth);
+                        if (s?.username && s.username.includes('#')) {
+                            candidateIds.add(s.username);
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            const uniqueRiotIds = [...candidateIds];
 
             if (uniqueRiotIds.length === 0) {
                 return interaction.editReply({
-                    content: `🏆 Aucun joueur surveillé n'est encore enregistré dans la base de données.`
+                    content: `🏆 Aucun joueur surveillé n'est encore enregistré dans la base de données. Liez votre compte avec **/login** ou suivez des joueurs sur le site !`
                 });
             }
 
@@ -954,6 +970,13 @@ client.on('interactionCreate', async interaction => {
                         });
                     }
                 } catch (e) {}
+                await sleep(500);
+            }
+
+            if (leaderboardList.length === 0) {
+                return interaction.editReply({
+                    content: `🏆 Impossible de récupérer les classements des joueurs enregistrés.`
+                });
             }
 
             leaderboardList.sort((a, b) => b.elo - a.elo);
