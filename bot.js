@@ -1,5 +1,18 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, ApplicationCommandOptionType } = require('discord.js');
+const { 
+    Client, 
+    GatewayIntentBits, 
+    REST, 
+    Routes, 
+    EmbedBuilder, 
+    ApplicationCommandOptionType,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle
+} = require('discord.js');
 const cron = require('node-cron');
 const { knex } = require('./database.js'); 
 const axios = require('axios'); 
@@ -8,6 +21,7 @@ const {
     decryptData,
     loginRiotRSO,
     submit2FACode,
+    buildSessionPayload,
     fetchStorefront,
     extractTokensFromUri
 } = require('./riotAuth.js');
@@ -211,6 +225,23 @@ client.on('guildCreate', async guild => {
     } catch (e) {}
 });
 
+const RIOT_AUTH_URL = "https://auth.riotgames.com/authorize?client_id=play-valorant-web-prod&response_type=token%20id_token&redirect_uri=https%3A%2F%2Fplayvalorant.com%2Fopt_in&scope=account%20openid&nonce=1";
+
+function createLoginActionRow() {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setLabel('1. Se connecter sur Riot Games')
+            .setStyle(ButtonStyle.Link)
+            .setURL(RIOT_AUTH_URL)
+            .setEmoji('🔗'),
+        new ButtonBuilder()
+            .setCustomId('btn_paste_riot_link')
+            .setLabel('2. Coller mon lien de connexion')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('📋')
+    );
+}
+
 // Helper: Handle Store Display Embed Generation
 async function handleStoreInteraction(interaction, tokenArg) {
     await interaction.deferReply({ ephemeral: true });
@@ -222,26 +253,23 @@ async function handleStoreInteraction(interaction, tokenArg) {
         const extracted = extractTokensFromUri(tokenArg);
         if (extracted.accessToken) {
             try {
-                const [entRes, userRes] = await Promise.all([
-                    axios.post('https://entitlements.auth.riotgames.com/api/token/v1', {}, {
-                        headers: { 'Authorization': `Bearer ${extracted.accessToken}`, 'Content-Type': 'application/json' }
-                    }),
-                    axios.get('https://auth.riotgames.com/userinfo', {
-                        headers: { 'Authorization': `Bearer ${extracted.accessToken}` }
-                    })
-                ]);
-                authSession = {
-                    accessToken: extracted.accessToken,
-                    idToken: extracted.idToken,
-                    entitlementsToken: entRes.data.entitlements_token,
-                    puuid: userRes.data.sub,
-                    username: userRes.data.acct?.game_name ? `${userRes.data.acct.game_name}#${userRes.data.acct.tag_line}` : (userRes.data.preferred_username || 'Agent'),
-                    shard: userRes.data.affinity?.pp ? userRes.data.affinity.pp.toLowerCase() : 'eu',
-                    cookieMap: {}
-                };
+                authSession = await buildSessionPayload(extracted.accessToken, extracted.idToken, {});
+                const encryptedSession = encryptData(authSession);
+                const existingUser = await knex('users').where({ discord_id: interaction.user.id }).first();
+                if (existingUser) {
+                    await knex('users').where({ discord_id: interaction.user.id }).update({ riot_auth: encryptedSession });
+                } else {
+                    await knex('users').insert({
+                        discord_id: interaction.user.id,
+                        username: interaction.user.username,
+                        avatar: interaction.user.displayAvatarURL(),
+                        riot_auth: encryptedSession
+                    });
+                }
             } catch (err) {
                 return interaction.editReply({
-                    content: `❌ **Le lien ou jeton Riot fourni est invalide ou a expiré.**\nVeuillez régénérer votre lien ou utiliser **/login** pour une connexion automatique persistante.`
+                    content: `❌ **Le lien ou jeton Riot fourni est invalide ou a expiré.**\nVeuillez vous reconnecter via les boutons ci-dessous.`,
+                    components: [createLoginActionRow()]
                 });
             }
         }
@@ -255,15 +283,22 @@ async function handleStoreInteraction(interaction, tokenArg) {
         }
     }
 
-    // 3. If still no session, provide instructions
+    // 3. If still no session, provide interactive buttons
     if (!authSession) {
+        const loginEmbed = new EmbedBuilder()
+            .setTitle('🛒 BOUTIQUE VALORANT • CONNEXION REQUISE')
+            .setColor(0x00f5d4)
+            .setDescription(
+                `Pour afficher votre boutique du jour en direct, liez votre compte Riot au bot (session persistante chiffrée AES-256).\n\n` +
+                `**Étapes simples (1-Clic) :**\n` +
+                `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
+                `2️⃣ Connectez-vous sur la page officielle Riot Games.\n` +
+                `3️⃣ Copiez l'URL de redirection (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
+                `4️⃣ Cliquez sur **"2. Coller mon lien de connexion"** pour valider !`
+            );
         return interaction.editReply({
-            content: `🛒 **Consulter votre Boutique Valorant sur Discord**\n\n` +
-                     `🔐 **Option 1 (Recommandée & Persistante) :**\n` +
-                     `Tapez **/login** avec votre identifiant et mot de passe Riot.\n` +
-                     `*(Votre mot de passe n'est jamais stocké en clair. La session est chiffrée en AES-256 et reste connectée automatiquement)*\n\n` +
-                     `🌐 **Option 2 (Sans identifiants) :**\n` +
-                     `Tapez \`/boutique lien_ou_token: <URL_Riot>\` en générant un lien via **${YOUR_WEBSITE_URL}**.`
+            embeds: [loginEmbed],
+            components: [createLoginActionRow()]
         });
     }
 
@@ -343,18 +378,89 @@ async function handleStoreInteraction(interaction, tokenArg) {
     } catch (err) {
         console.error("[RadianiteBot] Erreur chargement boutique:", err.response?.data || err.message);
         await interaction.editReply({
-            content: `❌ **Impossible de charger votre boutique Valorant.**\nVotre session a expiré ou Riot bloque l'accès temporairement. Veuillez renouveler votre connexion avec **/login**.`
+            content: `❌ **Impossible de charger votre boutique Valorant.**\nVotre session a expiré ou Riot bloque l'accès temporairement. Veuillez renouveler votre connexion ci-dessous.`,
+            components: [createLoginActionRow()]
         });
     }
 }
 
-// Handle Slash Command Interactions
+// Handle Slash Command, Button & Modal Interactions
 client.on('interactionCreate', async interaction => {
+    // 🔘 Handle Button: Open Riot Link Modal
+    if (interaction.isButton() && interaction.customId === 'btn_paste_riot_link') {
+        const modal = new ModalBuilder()
+            .setCustomId('modal_riot_login')
+            .setTitle('Lier mon compte Riot Games');
+
+        const linkInput = new TextInputBuilder()
+            .setCustomId('riot_link_input')
+            .setLabel('Collez votre lien Riot (playvalorant.com...)')
+            .setPlaceholder('https://playvalorant.com/opt_in#access_token=ey...')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        const actionRow = new ActionRowBuilder().addComponents(linkInput);
+        modal.addComponents(actionRow);
+
+        await interaction.showModal(modal);
+        return;
+    }
+
+    // 📋 Handle Modal Submission: Save Persistent Riot Session
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_riot_login') {
+        await interaction.deferReply({ ephemeral: true });
+        const rawLink = interaction.fields.getTextInputValue('riot_link_input');
+        const extracted = extractTokensFromUri(rawLink);
+
+        if (!extracted.accessToken) {
+            return interaction.editReply({
+                content: `❌ **Lien Riot invalide.**\nAssurez-vous de bien copier toute l'adresse URL commençant par \`https://playvalorant.com/opt_in#access_token=...\`.`
+            });
+        }
+
+        try {
+            const sessionData = await buildSessionPayload(extracted.accessToken, extracted.idToken, {});
+            const encryptedSession = encryptData(sessionData);
+
+            const existingUser = await knex('users').where({ discord_id: interaction.user.id }).first();
+            if (existingUser) {
+                await knex('users').where({ discord_id: interaction.user.id }).update({
+                    username: interaction.user.username,
+                    avatar: interaction.user.displayAvatarURL(),
+                    riot_auth: encryptedSession
+                });
+            } else {
+                await knex('users').insert({
+                    discord_id: interaction.user.id,
+                    username: interaction.user.username,
+                    avatar: interaction.user.displayAvatarURL(),
+                    riot_auth: encryptedSession
+                });
+            }
+
+            const successEmbed = new EmbedBuilder()
+                .setTitle('✅ COMPTE RIOT LIÉ AVEC SUCCÈS !')
+                .setColor(0x00f5d4)
+                .setDescription(
+                    `👤 **Joueur :** **${sessionData.username}**\n` +
+                    `🌐 **Région :** ${sessionData.shard.toUpperCase()}\n\n` +
+                    `🔒 *Votre session est chiffrée (AES-256) et reste connectée de façon persistante.*\n` +
+                    `👉 Tapez **/boutique** ou **/store** à tout moment pour voir vos skins du jour !`
+                );
+
+            return interaction.editReply({ embeds: [successEmbed] });
+        } catch (err) {
+            return interaction.editReply({
+                content: `❌ Impossible de valider le jeton Riot : ${err.message}`
+            });
+        }
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName } = interaction;
 
-    // 1. /login Command (Direct RSO Authentication or Official Link)
+    // 1. /login Command (Direct RSO Authentication or Official Link or Interactive Buttons)
     if (commandName === 'login') {
         await interaction.deferReply({ ephemeral: true });
 
@@ -362,7 +468,7 @@ client.on('interactionCreate', async interaction => {
         const password = interaction.options.getString('mot_de_passe');
         const linkArg = interaction.options.getString('lien');
 
-        // Case A: Link Provided
+        // Case A: Link Provided directly in command
         if (linkArg) {
             const extracted = extractTokensFromUri(linkArg);
             if (!extracted.accessToken) {
@@ -410,7 +516,6 @@ client.on('interactionCreate', async interaction => {
                 const result = await loginRiotRSO(username, password);
 
                 if (result.requires2FA) {
-                    // Save pending challenge for this user (expires in 10 minutes)
                     pending2FAMap.set(interaction.user.id, {
                         cookies: result.cookies,
                         expiresAt: Date.now() + 10 * 60 * 1000
@@ -423,11 +528,11 @@ client.on('interactionCreate', async interaction => {
 
                 if (!result.success) {
                     return interaction.editReply({
-                        content: `❌ **Échec de connexion Riot Games :**\n${result.error || 'Identifiant ou mot de passe incorrect.'}`
+                        content: `❌ **Échec de connexion directe :** ${result.error}\n\n👉 **Conseil :** Utilisez le bouton ci-dessous pour vous connecter en 1-clic via la page officielle Riot Games :`,
+                        components: [createLoginActionRow()]
                     });
                 }
 
-                // Encrypt and store persistent session
                 const encryptedSession = encryptData(result.session);
 
                 const existingUser = await knex('users').where({ discord_id: interaction.user.id }).first();
@@ -450,28 +555,35 @@ client.on('interactionCreate', async interaction => {
                     content: `✅ **Compte Riot connecté avec succès !**\n` +
                              `👤 **Joueur :** **${result.session.username}**\n` +
                              `🌐 **Région :** ${result.session.shard.toUpperCase()}\n\n` +
-                             `🔒 *Votre mot de passe n'est pas conservé. Votre session est chiffrée (AES-256) et reste persistante.*\n` +
+                             `🔒 *Votre session est chiffrée (AES-256) et reste persistante.*\n` +
                              `👉 Tapez **/boutique** ou **/store** à tout moment pour voir vos skins du jour !`
                 });
 
             } catch (err) {
                 console.error('[RadianiteBot] Erreur /login:', err);
                 return interaction.editReply({
-                    content: `❌ Une erreur inattendue est survenue lors de la connexion. Veuillez réessayer.`
+                    content: `❌ Une erreur inattendue est survenue. Veuillez utiliser la méthode 1-clic ci-dessous :`,
+                    components: [createLoginActionRow()]
                 });
             }
         }
 
-        // Case C: Neither provided
-        const authUrl = "https://auth.riotgames.com/authorize?client_id=play-valorant-web-prod&response_type=token%20id_token&redirect_uri=https%3A%2F%2Fplayvalorant.com%2Fopt_in&scope=account%20openid&nonce=1";
+        // Case C: Neither provided -> Display Interactive Action Row with Buttons
+        const loginEmbed = new EmbedBuilder()
+            .setTitle('🔐 CONNEXION COMPTE RIOT GAMES')
+            .setColor(0x00f5d4)
+            .setDescription(
+                `Connectez votre compte pour accéder à votre boutique quotidienne Valorant en direct !\n\n` +
+                `**Méthode Rapide & Recommandée (1-Clic) :**\n` +
+                `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
+                `2️⃣ Connectez-vous sur la page officielle Riot Games.\n` +
+                `3️⃣ Copiez l'URL de redirection (\`https://playvalorant.com/opt_in#access_token=...\`).\n` +
+                `4️⃣ Cliquez sur **"2. Coller mon lien de connexion"** pour valider !`
+            );
+
         return interaction.editReply({
-            content: `🔑 **Comment connecter votre compte Riot au Bot :**\n\n` +
-                     `**Méthode 1 (Identifiants) :**\n` +
-                     `Tapez **/login identifiant: ... mot_de_passe: ...**\n` +
-                     `*(Utilisez votre Nom d'utilisateur Riot Client launcher, et non votre pseudo en jeu)*\n\n` +
-                     `**Méthode 2 (Lien 1-Clic) :**\n` +
-                     `1. Ouvrez : <${authUrl}>\n` +
-                     `2. Tapez \`/login lien: https://playvalorant.com/opt_in#access_token=...\``
+            embeds: [loginEmbed],
+            components: [createLoginActionRow()]
         });
     }
 
