@@ -1053,8 +1053,8 @@ function buildHistoryPagePayload(historyData, page = 1, mode = 'competitive', is
             const isTop1 = mItem.dmPlacement === 1;
             mainEmbed.addFields({
                 name: `${isTop1 ? '🏆' : '💀'} ${globalNum}. ${isTop1 ? (isEn ? 'VICTORY (TOP 1)' : 'VICTOIRE (TOP 1)') : `TOP ${mItem.dmPlacement}/${mItem.totalPlayers}`} • ${mItem.map} (${mItem.character}) | <t:${mItem.gameStart}:R>`,
-                value: `🎯 **Score :** **${mItem.kills} Kills / ${mItem.deaths} ${isEn ? 'Deaths' : 'Morts'}** (**${mItem.kd} KD**) | 🎯 **HS :** ${mItem.hsPercent}%\n` +
-                       `────────────────────────────────────────`,
+                value: `> 🎯 **Score :** **${mItem.kills} Kills / ${mItem.deaths} ${isEn ? 'Deaths' : 'Morts'}** (**${mItem.kd} KD**)\n` +
+                       `> 🎯 **Précision :** **${mItem.hsPercent}% Headshot**\n\u200b`,
                 inline: false
             });
         } else {
@@ -1062,13 +1062,15 @@ function buildHistoryPagePayload(historyData, page = 1, mode = 'competitive', is
             const resultLabel = mItem.hasWon ? (isEn ? 'VICTORY' : 'VICTOIRE') : (isEn ? 'DEFEAT' : 'DÉFAITE');
             const scoreText = `${mItem.teamWon} - ${mItem.teamLost}`;
             const rankInfo = mItem.isComp && mItem.matchRankText 
-                ? `\n💎 **${isEn ? 'Rank' : 'Rang'} :** ${mItem.matchRankText} (${mItem.matchRRText}) • **${mItem.matchRRChange > 0 ? `+${mItem.matchRRChange}` : mItem.matchRRChange} RR**` 
+                ? `\n> 💎 **${isEn ? 'Rank' : 'Rang'} :** **${mItem.matchRankText}** (${mItem.matchRRText}) • **${mItem.matchRRChange > 0 ? `+${mItem.matchRRChange}` : mItem.matchRRChange} RR**` 
                 : '';
 
             mainEmbed.addFields({
                 name: `${icon} ${globalNum}. ${resultLabel} ${scoreText} • ${mItem.map} (${mItem.character}) | <t:${mItem.gameStart}:R>`,
-                value: `⚔️ **K/D/A :** ${mItem.kills}/${mItem.deaths}/${mItem.assists} (**${mItem.kd} KD**) | 💥 **ACS :** ${mItem.acs} | 🎯 **HS :** ${mItem.hsPercent}% | 🛡️ **DDΔ :** ${mItem.ddSign}${rankInfo}\n` +
-                       `────────────────────────────────────────`,
+                value: `> ⚔️ **K/D/A :** **${mItem.kills}/${mItem.deaths}/${mItem.assists}** (**${mItem.kd} KD**) • 💥 **ACS :** **${mItem.acs}**\n` +
+                       `> 🎯 **Headshot :** **${mItem.hsPercent}%** • 🛡️ **Damage Delta :** **${mItem.ddSign}**` +
+                       rankInfo +
+                       `\n\u200b`,
                 inline: false
             });
         }
@@ -1176,6 +1178,22 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
     const gameDurationMin = Math.round((match.metadata?.game_length || 0) / 60);
     const mapName = match.metadata?.map || 'Valorant';
 
+    // Rank & RR calculation for this specific match
+    const mmrHistory = historyData.mmrHistory || [];
+    const mmrEntry = mmrHistory.find(h => h.match_id === match.metadata?.matchid)
+                  || mmrHistory.find(h => Math.abs((h.date_raw || 0) - (match.metadata?.game_start || 0)) < 3600);
+
+    let rankWheelUrl = null;
+    let rankInfoLine = '';
+    if (mmrEntry) {
+        const change = mmrEntry.mmr_change_to_last_game || 0;
+        const rr = mmrEntry.ranking_in_tier ?? 50;
+        const tier = mmrEntry.currenttier || 18;
+        rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?rr=${rr}&change=${change}&tier=${tier}&size=360&t=${Date.now()}`;
+        const changeSign = change >= 0 ? `+${change}` : `${change}`;
+        rankInfoLine = `> 💎 **${isEn ? 'Match Rank' : 'Rang du Match'} :** **${mmrEntry.currenttierpatched || 'Ranked'}** (${rr} RR) • **${changeSign} RR** 📈\n`;
+    }
+
     // Find Match MVP (highest score across all players)
     const sortedAll = [...allPlayers].sort((a, b) => (b.stats?.score || 0) - (a.stats?.score || 0));
     const matchMvp = sortedAll[0];
@@ -1191,17 +1209,18 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
         .setDescription(
             (isDM
                 ? `🎮 **Mode :** Match à Mort (Deathmatch) • ⏱️ **Durée :** ${gameDurationMin} min\n` +
-                  `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n` +
+                  `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n\n` +
                   `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
                   `────────────────────────────────────────`
                 : `🏆 **Résultat :** **${hasWon ? (isEn ? 'VICTORY' : 'VICTOIRE') : (isEn ? 'DEFEAT' : 'DÉFAITE')}** (${myTeam.rounds_won} - ${myTeam.rounds_lost})\n` +
                   `⏱️ **Durée :** ${gameDurationMin} min • **Rounds joués :** ${match.metadata?.rounds_played || 0}\n` +
                   `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n` +
+                  rankInfoLine +
                   `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
                   `────────────────────────────────────────`
             )
         )
-        .setThumbnail(myPlayer?.assets?.agent?.small || 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
+        .setThumbnail(rankWheelUrl || myPlayer?.assets?.agent?.small || 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
         .setFooter({ text: isEn ? `RadianiteDB Scoreboard Intelligence • Match #${matchIndex + 1}` : `RadianiteDB Scoreboard • Match #${matchIndex + 1}` })
         .setTimestamp(new Date((match.metadata?.game_start || 0) * 1000));
 
@@ -1216,7 +1235,8 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
             const hs = totalShots > 0 ? Math.round(((p.stats?.headshots || 0) / totalShots) * 100) : 0;
             const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
 
-            return `${medal} ${isSelf ? `👉 **${p.name}#${p.tag}**` : `**${p.name}#${p.tag}**`} (${p.character}) — **${kills}K / ${deaths}D** (${kd} KD) • ${hs}% HS`;
+            return `${medal} ${isSelf ? `👉 **${p.name}#${p.tag}**` : `**${p.name}#${p.tag}**`} (${p.character})\n` +
+                   `> 🎯 **${kills} Kills / ${deaths} Morts** (**${kd} KD**) • **${hs}% HS**\n`;
         });
 
         scoreboardEmbed.addFields({
@@ -1244,8 +1264,10 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
             const hs = totalShots > 0 ? Math.round(((p.stats?.headshots || 0) / totalShots) * 100) : 0;
             const tierStr = p.currenttier_patched ? ` • *${p.currenttier_patched}*` : '';
 
-            return `${isSelf ? '👉 ' : ''}**${p.name}#${p.tag}** (${p.character}${tierStr}) ${isMvp ? '👑' : ''}\n` +
-                   `└ ⚔️ **${kills}/${deaths}/${assists}** (${kd} KD) • **${acs} ACS** • ${hs}% HS`;
+            const prefix = isSelf ? '👉 ' : '▫️ ';
+            const mvpBadge = isMvp ? ' 👑 **(MVP)**' : '';
+            return `${prefix}**${p.name}#${p.tag}** (${p.character}${tierStr})${mvpBadge}\n` +
+                   `> ⚔️ **${kills} / ${deaths} / ${assists}** (**${kd} KD**) • 💥 **${acs} ACS** • 🎯 **${hs}% HS**\n`;
         };
 
         const blueLines = blueTeamPlayers.map(formatPlayerLine).join('\n') || (isEn ? 'No players' : 'Aucun joueur');
