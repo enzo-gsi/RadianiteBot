@@ -767,6 +767,65 @@ async function generateSessionReport(targetRiotId, isEn = false) {
 // History Data Cache Map (key: 'name#tag' -> { matches, mmrHistory, currentMmr, timestamp })
 const historyCacheMap = new Map();
 
+function formatLifetimeMatch(m, targetName, targetTag) {
+    const meta = m.meta || {};
+    const stats = m.stats || {};
+    const teams = m.teams || {};
+    
+    const rawMode = (meta.mode || 'Competitive').toLowerCase();
+    const isComp = rawMode.includes('competitive') || rawMode.includes('ranked');
+    const isDM = rawMode.includes('deathmatch') && !rawMode.includes('team');
+    
+    const myTeamKey = (stats.team || 'Blue').toLowerCase();
+    const blueScore = teams.blue || 0;
+    const redScore = teams.red || 0;
+    const myScore = myTeamKey === 'red' ? redScore : blueScore;
+    const opponentScore = myTeamKey === 'red' ? blueScore : redScore;
+    const hasWon = isDM ? (stats.kills >= 40 || stats.score >= 10000) : (myScore > opponentScore);
+    
+    const roundsPlayed = (blueScore + redScore) || 1;
+    const startedAt = meta.started_at ? Math.floor(new Date(meta.started_at).getTime() / 1000) : Math.floor(Date.now() / 1000);
+
+    return {
+        metadata: {
+            matchid: meta.id,
+            map: meta.map?.name || 'Valorant',
+            mode: meta.mode || 'Competitive',
+            game_start: startedAt,
+            rounds_played: roundsPlayed,
+            game_length: roundsPlayed * 105
+        },
+        teams: {
+            blue: { rounds_won: blueScore, rounds_lost: redScore, has_won: blueScore > redScore },
+            red: { rounds_won: redScore, rounds_lost: blueScore, has_won: redScore > blueScore },
+            [myTeamKey]: { rounds_won: myScore, rounds_lost: opponentScore, has_won: hasWon }
+        },
+        players: {
+            all_players: [
+                {
+                    name: stats.name || targetName,
+                    tag: stats.tag || targetTag,
+                    puuid: stats.puuid,
+                    character: stats.character?.name || 'Agent',
+                    team: myTeamKey === 'red' ? 'Red' : 'Blue',
+                    currenttier: stats.tier || 0,
+                    stats: {
+                        score: stats.score || 0,
+                        kills: stats.kills || 0,
+                        deaths: stats.deaths || 0,
+                        assists: stats.assists || 0,
+                        headshots: stats.shots?.head || 0,
+                        bodyshots: stats.shots?.body || 0,
+                        legshots: stats.shots?.leg || 0
+                    },
+                    damage_made: stats.damage?.made || 0,
+                    damage_received: stats.damage?.received || 0
+                }
+            ]
+        }
+    };
+}
+
 async function getPlayerHistoryData(name, tag, forceReload = false) {
     const key = `${name.toLowerCase()}#${tag.toLowerCase()}`;
     const now = Date.now();
@@ -786,16 +845,38 @@ async function getPlayerHistoryData(name, tag, forceReload = false) {
         }
     } catch (e) {}
 
-    // Fetch up to 20 matches & MMR history concurrently
-    const [matchesRes, mmrHistRes, mmrV2Res] = await Promise.all([
-        henrikApi.get(`/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=20`).catch(() => null),
+    // Fetch 50 lifetime matches, v3 matches & MMR history concurrently
+    const [lifetimeRes, v3Res, mmrHistRes, mmrV2Res] = await Promise.all([
+        henrikApi.get(`/valorant/v1/lifetime/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=50`).catch(() => null),
+        henrikApi.get(`/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=10`).catch(() => null),
         henrikApi.get(`/valorant/v1/mmr-history/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null),
         henrikApi.get(`/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null)
     ]);
 
-    const matches = matchesRes?.data?.data || [];
+    const rawLifetime = lifetimeRes?.data?.data || [];
+    const rawV3 = v3Res?.data?.data || [];
     const mmrHistory = mmrHistRes?.data?.data || [];
     const currentMmr = mmrV2Res?.data?.data || null;
+
+    // Merge v3 and lifetime matches to get max coverage & detail
+    const matchMap = new Map();
+
+    // 1. Add lifetime matches (up to 50 games)
+    rawLifetime.forEach(m => {
+        if (m.meta?.id) {
+            matchMap.set(m.meta.id, formatLifetimeMatch(m, name, tag));
+        }
+    });
+
+    // 2. Overwrite with full v3 matches where available
+    rawV3.forEach(m => {
+        if (m.metadata?.matchid) {
+            matchMap.set(m.metadata.matchid, m);
+        }
+    });
+
+    // Sort descending by start time
+    const matches = Array.from(matchMap.values()).sort((a, b) => (b.metadata?.game_start || 0) - (a.metadata?.game_start || 0));
 
     const result = {
         name,
@@ -1036,7 +1117,7 @@ function buildHistoryPagePayload(historyData, page = 1, mode = 'competitive', is
     };
 }
 
-function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage = 1, mode = 'competitive', isEn = false) {
+async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage = 1, mode = 'competitive', isEn = false) {
     const { name, tag, matches } = historyData;
 
     // Filter matches to match the list ordering
@@ -1052,7 +1133,7 @@ function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage = 1, m
         return true;
     });
 
-    const match = filteredMatches[matchIndex] || matches[0];
+    let match = filteredMatches[matchIndex] || matches[0];
     if (!match) {
         return {
             embeds: [
@@ -1070,6 +1151,17 @@ function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage = 1, m
                 )
             ]
         };
+    }
+
+    // If only basic lifetime match data is present, fetch full 10-player match details
+    if ((match.players?.all_players?.length || 0) <= 1 && match.metadata?.matchid) {
+        try {
+            const singleMatchRes = await henrikApi.get(`/valorant/v2/match/${match.metadata.matchid}`).catch(() => null);
+            if (singleMatchRes?.data?.data?.players?.all_players) {
+                match = singleMatchRes.data.data;
+                filteredMatches[matchIndex] = match;
+            }
+        } catch (e) {}
     }
 
     const allPlayers = match.players?.all_players || [];
@@ -1256,7 +1348,7 @@ client.on('interactionCreate', async interaction => {
 
             try {
                 const historyData = await getPlayerHistoryData(name, tag, false);
-                const payload = buildMatchDetailsPayload(historyData, matchIndex, returnPage, mode, isEn);
+                const payload = await buildMatchDetailsPayload(historyData, matchIndex, returnPage, mode, isEn);
                 await interaction.editReply(payload);
             } catch (err) {
                 console.error('[RadianiteBot] Error showing match details:', err);
