@@ -98,60 +98,183 @@ async function refreshValorantData() {
 // Slash Commands Definition (All descriptions <= 100 chars as per Discord API)
 const commands = [
     {
-        name: 'boutique',
-        description: 'Boutique Valorant du jour, soldes VP/RP/KC et Marché Nocturne.',
+        name: 'history',
+        description: 'Match history (5/page), net RR wheel, current rank and lobby scoreboards.',
         options: [
             {
-                name: 'lien_ou_token',
-                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
+                name: 'player',
+                description: 'Optional: Player name#TAG (e.g. TenZ#SEN or Boaster#FNC)',
                 type: ApplicationCommandOptionType.String,
                 required: false
+            },
+            {
+                name: 'mode',
+                description: 'Filter game mode (Competitive by default)',
+                type: ApplicationCommandOptionType.String,
+                required: false,
+                choices: [
+                    { name: '🏆 Competitive / Ranked', value: 'competitive' },
+                    { name: '🌐 All Modes', value: 'all' },
+                    { name: '🎯 Deathmatch', value: 'deathmatch' },
+                    { name: '⚡ Swiftplay', value: 'swiftplay' },
+                    { name: '🥊 Team Deathmatch', value: 'teamdeathmatch' },
+                    { name: '🎮 Unrated', value: 'unrated' }
+                ]
             }
         ]
     },
     {
         name: 'store',
-        description: 'Boutique Valorant du jour en direct (alias /boutique).',
+        description: 'Check your live 24h Valorant daily store, wallet balances and Night Market.',
         options: [
             {
-                name: 'lien_ou_token',
-                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
+                name: 'link_or_token',
+                description: 'Optional: Paste your official Riot link or access token',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
         ]
     },
     {
-        name: 'shop',
-        description: 'Boutique Valorant du jour en direct (alias /boutique).',
+        name: 'session',
+        description: 'Daily match performance recap, net RR win/loss, and KD telemetry.',
         options: [
             {
-                name: 'lien_ou_token',
-                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
+                name: 'player',
+                description: 'Optional: Player name#TAG to inspect',
                 type: ApplicationCommandOptionType.String,
                 required: false
+            }
+        ]
+    },
+    {
+        name: 'wishlist',
+        description: 'Manage skin wishlist and receive automated DM alerts upon rotation drops.',
+        options: [
+            {
+                name: 'add',
+                description: 'Add a weapon skin to your wishlist',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Weapon skin name (autocomplete supported)',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'remove',
+                description: 'Remove a weapon skin from your wishlist',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Weapon skin name to remove',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'list',
+                description: 'Display all your currently tracked wishlist skins',
+                type: ApplicationCommandOptionType.Subcommand
+            }
+        ]
+    },
+    {
+        name: 'scout',
+        description: 'Scout player profile: rank, winrate, headshot accuracy & weapon mastery.',
+        options: [
+            {
+                name: 'player',
+                description: 'Optional: Player name#TAG to analyze',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
+    },
+    {
+        name: 'leaderboard',
+        description: 'Server competitive leaderboard of followed players (RR, Rank, KD).',
+    },
+    {
+        name: 'follow',
+        description: 'Follow a player to receive automated match results & rank-up alerts in this server.',
+        options: [
+            {
+                name: 'player',
+                description: 'Player name#TAG to follow (e.g. TenZ#SEN)',
+                type: ApplicationCommandOptionType.String,
+                required: true
+            }
+        ]
+    },
+    {
+        name: 'unfollow',
+        description: 'Stop tracking a player in this server.',
+        options: [
+            {
+                name: 'player',
+                description: 'Player name#TAG to unfollow',
+                type: ApplicationCommandOptionType.String,
+                required: true
+            }
+        ]
+    },
+    {
+        name: 'setchannel',
+        description: 'Set target Discord channel for post-match summary and rank-up alerts.',
+        options: [
+            {
+                name: 'channel',
+                description: 'Optional: Channel to send alerts to (defaults to current channel)',
+                type: ApplicationCommandOptionType.Channel,
+                required: false
+            }
+        ]
+    },
+    {
+        name: 'language',
+        description: 'Change bot language for this server or user.',
+        options: [
+            {
+                name: 'lang',
+                description: 'Select language',
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: [
+                    { name: '🇺🇸 English', value: 'en' },
+                    { name: '🇫🇷 Français', value: 'fr' },
+                    { name: '🇪🇸 Español', value: 'es' },
+                    { name: '🇩🇪 Deutsch', value: 'de' }
+                ]
             }
         ]
     },
     {
         name: 'login',
-        description: 'Lier votre compte Riot (session persistante chiffrée AES-256).',
+        description: 'Link your Riot account for live store & match tracking (AES-256 encrypted).',
         options: [
             {
-                name: 'identifiant',
-                description: 'Option 1: Nom d\'utilisateur Riot Games (login launcher)',
+                name: 'username',
+                description: 'Riot Games account username',
                 type: ApplicationCommandOptionType.String,
                 required: false
             },
             {
-                name: 'mot_de_passe',
-                description: 'Option 1: Mot de passe Riot Games',
+                name: 'password',
+                description: 'Riot Games account password',
                 type: ApplicationCommandOptionType.String,
                 required: false
             },
             {
-                name: 'lien',
-                description: 'Option 2: Lien officiel Riot (playvalorant.com/opt_in...)',
+                name: 'link',
+                description: 'Official Riot auth link (playvalorant.com/opt_in...)',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
@@ -159,11 +282,11 @@ const commands = [
     },
     {
         name: '2fa',
-        description: 'Valider le code de sécurité 2FA reçu par email.',
+        description: 'Submit 6-digit email 2FA verification code.',
         options: [
             {
                 name: 'code',
-                description: 'Le code de sécurité à 6 chiffres reçu par email',
+                description: 'The 6-digit 2FA code received by email',
                 type: ApplicationCommandOptionType.String,
                 required: true
             }
@@ -171,150 +294,11 @@ const commands = [
     },
     {
         name: 'unlink',
-        description: 'Supprimer définitivement votre session Riot du bot.',
+        description: 'Permanently remove your saved Riot credentials from the bot.',
     },
     {
-        name: 'setchannel',
-        description: 'Définir ce salon textuel pour les alertes de fin de match.',
-    },
-    {
-        name: 'wishlist',
-        description: 'Gérer vos skins souhaités (alertes MP automatiques lors des rotations de boutique).',
-        options: [
-            {
-                name: 'ajouter',
-                description: 'Ajouter un skin à surveiller dans votre boutique quotidienne.',
-                type: ApplicationCommandOptionType.Subcommand,
-                options: [
-                    {
-                        name: 'skin',
-                        description: 'Nom du skin d\'arme Valorant à surveiller',
-                        type: ApplicationCommandOptionType.String,
-                        required: true,
-                        autocomplete: true
-                    }
-                ]
-            },
-            {
-                name: 'retirer',
-                description: 'Retirer un skin de votre liste de surveillance.',
-                type: ApplicationCommandOptionType.Subcommand,
-                options: [
-                    {
-                        name: 'skin',
-                        description: 'Nom du skin à retirer de votre liste',
-                        type: ApplicationCommandOptionType.String,
-                        required: true,
-                        autocomplete: true
-                    }
-                ]
-            },
-            {
-                name: 'liste',
-                description: 'Afficher tous vos skins actuellement surveillés.',
-                type: ApplicationCommandOptionType.Subcommand
-            }
-        ]
-    },
-    {
-        name: 'scout',
-        description: 'Analyser en direct le lobby et les rangs/stats des adversaires.',
-        options: [
-            {
-                name: 'joueur',
-                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
-                type: ApplicationCommandOptionType.String,
-                required: false
-            }
-        ]
-    },
-    {
-        name: 'classement',
-        description: 'Classement compétitif du serveur Discord (Top RR, Rangs, K/D).',
-    },
-    {
-        name: 'leaderboard',
-        description: 'Server competitive leaderboard (Top RR, Ranks, K/D).',
-    },
-    {
-        name: 'session',
-        description: 'Rapport de performance des parties jouées sur les dernières 24h.',
-        options: [
-            {
-                name: 'joueur',
-                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
-                type: ApplicationCommandOptionType.String,
-                required: false
-            }
-        ]
-    },
-    {
-        name: 'language',
-        description: 'Choisir la langue des messages du bot (Français / English).',
-        options: [
-            {
-                name: 'langue',
-                description: 'Sélectionnez Français ou English',
-                type: ApplicationCommandOptionType.String,
-                required: true,
-                choices: [
-                    { name: '🇫🇷 Français', value: 'fr' },
-                    { name: '🇺🇸 English', value: 'en' }
-                ]
-            }
-        ]
-    },
-    {
-        name: 'history',
-        description: 'Historique des matchs (5 par page), évolution RR, roue de rang et scoreboards détaillés.',
-        options: [
-            {
-                name: 'joueur',
-                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
-                type: ApplicationCommandOptionType.String,
-                required: false
-            },
-            {
-                name: 'mode',
-                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
-                type: ApplicationCommandOptionType.String,
-                required: false,
-                choices: [
-                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
-                    { name: '🌐 Tous les modes (All)', value: 'all' },
-                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
-                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
-                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
-                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
-                ]
-            }
-        ]
-    },
-    {
-        name: 'historique',
-        description: 'Historique des matchs (5 par page), évolution RR et scoreboards (alias /history).',
-        options: [
-            {
-                name: 'joueur',
-                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
-                type: ApplicationCommandOptionType.String,
-                required: false
-            },
-            {
-                name: 'mode',
-                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
-                type: ApplicationCommandOptionType.String,
-                required: false,
-                choices: [
-                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
-                    { name: '🌐 Tous les modes (All)', value: 'all' },
-                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
-                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
-                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
-                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
-                ]
-            }
-        ]
+        name: 'help',
+        description: 'Show all available RadianiteBot commands and features.',
     }
 ];
 
@@ -391,6 +375,21 @@ async function syncGuildsAnalytics() {
                 updated_at: knex.fn.now()
             });
         }
+
+        // Also ensure each guild has a default config entry in guild_configs
+        for (const g of guilds) {
+            try {
+                const gc = await knex('guild_configs').where({ guild_id: g.id }).first();
+                if (!gc) {
+                    await knex('guild_configs').insert({
+                        guild_id: g.id,
+                        guild_name: g.name,
+                        guild_icon: g.icon,
+                        language: 'en'
+                    });
+                }
+            } catch (e) {}
+        }
     } catch (e) {}
 }
 
@@ -401,7 +400,7 @@ client.once('ready', async () => {
     await syncGuildsAnalytics();
 });
 
-// Auto-register on new guild join & Notify Owner @codedwld in DM
+// Auto-register on new guild join & post interactive English welcome embed
 client.on('guildCreate', async guild => {
     await syncGuildsAnalytics();
     await incrementBotStat('guilds_joined');
@@ -412,17 +411,60 @@ client.on('guildCreate', async guild => {
         );
     } catch (e) {}
 
-    // Send DM Notification to @codedwld
+    // Save default guild config in English
+    try {
+        await knex('guild_configs').insert({
+            guild_id: guild.id,
+            guild_name: guild.name,
+            guild_icon: guild.iconURL({ dynamic: true }) || null,
+            language: 'en'
+        });
+    } catch (e) {}
+
+    // Post rich English presentation embed to server system or first text channel
+    try {
+        let channel = guild.systemChannel;
+        if (!channel || !channel.permissionsFor(guild.members.me)?.has(['SendMessages', 'EmbedLinks'])) {
+            channel = guild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(guild.members.me)?.has(['SendMessages', 'EmbedLinks']));
+        }
+
+        if (channel) {
+            const welcomeEmbed = new EmbedBuilder()
+                .setTitle('⚡ RADIANITEBOT // VALORANT TELEMETRY COMPANION')
+                .setColor(0x00f5d4)
+                .setDescription(`**Thank you for inviting RadianiteBot to ${guild.name}!** 🎯\n\nRadianiteBot is your high-precision Valorant companion for real-time match tracking, 24h store inspection, automated rank alerts, and squad leaderboards.`)
+                .addFields(
+                    { name: '📊 `/history [player]`', value: '50+ match archives with 5-game net RR Wheel and 10-player interactive lobby scoreboards.', inline: false },
+                    { name: '🛒 `/store` & `/wishlist`', value: 'Check your 24h rotating skin store, Night Market discounts, and set alerts for your favorite skins.', inline: false },
+                    { name: '📈 `/session [player]`', value: '24h session performance recap with net RR, Win/Loss and stats.', inline: false },
+                    { name: '🔍 `/scout [player]`', value: 'Live MMR, rank telemetry, headshot accuracy & favorite weapons.', inline: false },
+                    { name: '🏆 `/leaderboard`', value: 'Server squad leaderboard ranking followed players by RR & tier.', inline: false },
+                    { name: '👥 `/follow [player]` & `/unfollow`', value: 'Follow players to automatically receive post-match summary cards in your server channel.', inline: false },
+                    { name: '🔔 `/setchannel`', value: 'Set the dedicated channel for automatic match notifications.', inline: false }
+                )
+                .setFooter({ text: 'RadianiteDB Protocol • Select your preferred language below:', iconURL: 'https://www.radianitedb.lol/favicon.png' })
+                .setTimestamp();
+
+            const langRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('setlang_en').setLabel('🇺🇸 English').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('setlang_fr').setLabel('🇫🇷 Français').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('setlang_es').setLabel('🇪🇸 Español').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('setlang_de').setLabel('🇩🇪 Deutsch').setStyle(ButtonStyle.Secondary)
+            );
+
+            await channel.send({ embeds: [welcomeEmbed], components: [langRow] }).catch(() => {});
+        }
+    } catch (wErr) {
+        console.warn('[GuildCreate] Welcome send notice:', wErr.message);
+    }
+
+    // Send DM Notification to Owner
     try {
         const ownerId = process.env.OWNER_DISCORD_ID || 'codedwld';
         let targetUser = null;
-        
-        // Try direct ID fetch first
         if (/^\d+$/.test(ownerId)) {
             targetUser = await client.users.fetch(ownerId).catch(() => null);
         }
-        
-        // If not found by ID or ID is username, find across cache/guilds
         if (!targetUser) {
             targetUser = client.users.cache.find(u => 
                 u.username.toLowerCase() === 'codedwld' || 
@@ -430,25 +472,6 @@ client.on('guildCreate', async guild => {
                 u.globalName?.toLowerCase() === 'codedwld'
             );
         }
-
-        if (!targetUser) {
-            // Search in guild members
-            for (const [, g] of client.guilds.cache) {
-                try {
-                    const members = await g.members.fetch({ query: 'codedwld', limit: 5 });
-                    const found = members.find(m => 
-                        m.user.username.toLowerCase() === 'codedwld' || 
-                        m.user.tag?.toLowerCase() === 'codedwld' ||
-                        m.user.globalName?.toLowerCase() === 'codedwld'
-                    );
-                    if (found) {
-                        targetUser = found.user;
-                        break;
-                    }
-                } catch (mErr) {}
-            }
-        }
-
         if (targetUser) {
             const embed = new EmbedBuilder()
                 .setTitle('🎉 Nouveau serveur ajouté !')
@@ -464,16 +487,13 @@ client.on('guildCreate', async guild => {
                 .setThumbnail(guild.iconURL({ dynamic: true }) || 'https://www.radianitedb.lol/favicon.png')
                 .setTimestamp();
 
-            await targetUser.send({ embeds: [embed] }).catch(err => {
-                console.warn('[GuildCreate] Impossible d\'envoyer le MP à @codedwld:', err.message);
-            });
-            console.log(`[GuildCreate] Notification MP envoyée à ${targetUser.tag} pour le serveur ${guild.name}`);
-        } else {
-            console.log(`[GuildCreate] Rejoint ${guild.name} (${guild.memberCount} membres). @codedwld non trouvé en cache (précisez OWNER_DISCORD_ID dans .env si besoin).`);
+            await targetUser.send({ embeds: [embed] }).catch(() => {});
         }
-    } catch (notifErr) {
-        console.error('[GuildCreate] Erreur notification MP:', notifErr.message);
-    }
+    } catch (notifErr) {}
+});
+
+client.on('guildDelete', async () => {
+    await syncGuildsAnalytics();
 });
 
 const RIOT_AUTH_URL = "https://auth.riotgames.com/authorize?client_id=play-valorant-web-prod&response_type=token%20id_token&redirect_uri=https%3A%2F%2Fplayvalorant.com%2Fopt_in&scope=account%20openid&nonce=1";
@@ -1388,6 +1408,25 @@ client.on('interactionCreate', async interaction => {
             }
             return;
         }
+
+        if (interaction.customId.startsWith('setlang_')) {
+            const chosenLang = interaction.customId.replace('setlang_', '');
+            if (interaction.guildId) {
+                await knex('guild_configs').insert({
+                    guild_id: interaction.guildId,
+                    guild_name: interaction.guild?.name || 'Discord Server',
+                    language: chosenLang
+                });
+            }
+            await knex('users').where({ discord_id: interaction.user.id }).update({ language: chosenLang }).catch(() => {});
+            const msgs = {
+                en: '🇺🇸 **Language set to English!** Type `/help` to see all commands.',
+                fr: '🇫🇷 **Langue définie sur Français !** Tapez `/help` pour voir toutes les commandes.',
+                es: '🇪🇸 **¡Idioma establecido en Español!** Escribe `/help` para ver los comandos.',
+                de: '🇩🇪 **Sprache auf Deutsch eingestellt!** Tippe `/help` für alle Befehle.'
+            };
+            return interaction.reply({ content: msgs[chosenLang] || msgs.en, ephemeral: true });
+        }
     }
 
     // 📋 Handle Modal Submission: Save Persistent Riot Session
@@ -1633,7 +1672,7 @@ client.on('interactionCreate', async interaction => {
         return interaction.editReply({
             content: isEn 
                 ? `✅ **2FA Authentication verified!**\n👤 **Player :** **${result.session.username}**\n\n👉 Type **/store** to view your daily shop!`
-                : `✅ **Authentification 2FA validée !**\n👤 **Joueur :** **${result.session.username}**\n\n👉 Tapez **/boutique** ou **/store** pour consulter votre boutique du jour !`
+                : `✅ **Authentification 2FA validée !**\n👤 **Joueur :** **${result.session.username}**\n\n👉 Tapez **/store** pour consulter votre boutique du jour !`
         });
     }
 
@@ -1650,9 +1689,9 @@ client.on('interactionCreate', async interaction => {
         });
     }
 
-    // 4. /boutique, /store, /shop Commands
-    if (commandName === 'boutique' || commandName === 'store' || commandName === 'shop') {
-        const tokenArg = interaction.options.getString('lien_ou_token');
+    // 4. /store, /shop, /boutique Commands
+    if (commandName === 'store' || commandName === 'shop' || commandName === 'boutique') {
+        const tokenArg = interaction.options.getString('link_or_token') || interaction.options.getString('lien_ou_token');
         await handleStoreInteraction(interaction, tokenArg);
     }
 
@@ -1660,9 +1699,17 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'setchannel') {
         const isEn = (await getUserLang(interaction.user.id)) === 'en';
         const discord_id = interaction.user.id;
-        const channel_id = interaction.channel.id;
+        const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+        const channel_id = targetChannel.id;
 
         try {
+            if (interaction.guildId) {
+                await knex('guild_configs').insert({
+                    guild_id: interaction.guildId,
+                    guild_name: interaction.guild?.name || 'Discord Server',
+                    channel_id: channel_id
+                });
+            }
             const user = await knex('users').where({ discord_id }).first();
             if (!user) {
                 await knex('users').insert({
@@ -1679,8 +1726,8 @@ client.on('interactionCreate', async interaction => {
             
             await interaction.reply({ 
                 content: isEn 
-                    ? `✅ **Alerts channel configured!** Match notifications for your tracked players will be sent in **#${interaction.channel.name}**.`
-                    : `✅ **Salon configuré !** Les notifications de match pour vos joueurs suivis seront envoyées dans **#${interaction.channel.name}**.`,
+                    ? `✅ **Alerts channel configured!** Match notifications for your tracked players will be sent in <#${channel_id}>.`
+                    : `✅ **Salon configuré !** Les notifications de match pour vos joueurs suivis seront envoyées dans <#${channel_id}>.`,
                 ephemeral: true 
             });
         } catch (err) {
@@ -1689,12 +1736,12 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // 6. /wishlist Command (Subcommands: ajouter, retirer, liste)
+    // 6. /wishlist Command (Subcommands: add, remove, list / ajouter, retirer, liste)
     if (commandName === 'wishlist') {
         const isEn = (await getUserLang(interaction.user.id)) === 'en';
         const sub = interaction.options.getSubcommand();
 
-        if (sub === 'ajouter') {
+        if (sub === 'add' || sub === 'ajouter') {
             await interaction.deferReply({ ephemeral: true });
             const skinName = interaction.options.getString('skin');
             const foundSkin = Object.values(valorantWeaponMap).find(s => s.displayName?.toLowerCase() === skinName.toLowerCase())
@@ -1726,7 +1773,7 @@ client.on('interactionCreate', async interaction => {
             return interaction.editReply({ embeds: [embed] });
         }
 
-        if (sub === 'retirer') {
+        if (sub === 'remove' || sub === 'retirer') {
             await interaction.deferReply({ ephemeral: true });
             const skinName = interaction.options.getString('skin');
             await knex('wishlist').where({ discord_id: interaction.user.id, skin_name: skinName }).del();
@@ -1738,15 +1785,15 @@ client.on('interactionCreate', async interaction => {
             });
         }
 
-        if (sub === 'liste') {
+        if (sub === 'list' || sub === 'liste') {
             await interaction.deferReply({ ephemeral: true });
             const userWishes = await knex('wishlist').where({ discord_id: interaction.user.id }).select();
 
             if (userWishes.length === 0) {
                 return interaction.editReply({
                     content: isEn
-                        ? `📋 **Your wishlist is empty.**\nUse **/wishlist ajouter skin: ...** to track skins and receive automatic DM alerts!`
-                        : `📋 **Votre wishlist est vide.**\nUtilisez **/wishlist ajouter skin: ...** pour ajouter vos skins de rêve et recevoir une alerte automatique !`
+                        ? `📋 **Your wishlist is empty.**\nUse **/wishlist add skin: ...** to track skins and receive automatic DM alerts!`
+                        : `📋 **Votre wishlist est vide.**\nUtilisez **/wishlist add skin: ...** pour ajouter vos skins de rêve et recevoir une alerte automatique !`
                 });
             }
 
@@ -1765,7 +1812,7 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // 7. /scout Command (Live Match Intelligence & 10-Player Lobby Radar)
+    // 7. /scout Command
     if (commandName === 'scout') {
         await interaction.deferReply({ ephemeral: false });
 
@@ -1777,7 +1824,6 @@ client.on('interactionCreate', async interaction => {
             userSession = decryptData(dbUser.riot_auth);
         }
 
-        // Case 1: User is NOT logged in -> Display actionable login guide
         if (!userSession?.accessToken || !userSession?.puuid) {
             const notLoggedEmbed = new EmbedBuilder()
                 .setTitle(isEn ? '🔐 LOGIN REQUIRED FOR LIVE SCOUTING' : '🔐 CONNEXION REQUISE POUR LE LIVE SCOUTING')
@@ -1803,7 +1849,6 @@ client.on('interactionCreate', async interaction => {
             });
         }
 
-        // Case 2: User IS logged in -> Probe Riot Core-Game & Pre-Game
         try {
             const shard = userSession.shard || 'eu';
             const region = shard === 'eu' ? 'eu-1' : shard === 'na' ? 'na-1' : shard === 'kr' ? 'kr-1' : 'ap-1';
@@ -1815,7 +1860,6 @@ client.on('interactionCreate', async interaction => {
                 'User-Agent': 'ShooterGame/14 Windows/10.0.19042.1.256.64bit'
             };
 
-            // A. Check Core-Game (In-Match)
             let liveMatchData = null;
             let isPregame = false;
 
@@ -1827,7 +1871,6 @@ client.on('interactionCreate', async interaction => {
                 }
             } catch (cErr) {}
 
-            // B. Check Pre-Game (Agent Select) if not in core-game
             if (!liveMatchData) {
                 try {
                     const prePlayerRes = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/pregame/v1/players/${userSession.puuid}`, { headers: riotHeaders });
@@ -1839,7 +1882,6 @@ client.on('interactionCreate', async interaction => {
                 } catch (pErr) {}
             }
 
-            // Case 3: Live match is ACTIVE! Build full 10-player scouting radar
             if (liveMatchData && liveMatchData.Players?.length > 0) {
                 const myPlayer = liveMatchData.Players.find(p => p.Subject === userSession.puuid);
                 const myTeamId = myPlayer?.TeamID || 'Blue';
@@ -1906,7 +1948,6 @@ client.on('interactionCreate', async interaction => {
                 return interaction.editReply({ embeds: [liveEmbed] });
             }
 
-            // Case 4: Logged in, but NOT currently in match/agent select
             const notInGameEmbed = new EmbedBuilder()
                 .setTitle(isEn ? '⚠️ NO LIVE MATCH DETECTED' : '⚠️ AUCUNE PARTIE EN DIRECT DÉTECTÉE')
                 .setColor(0xffb703)
@@ -1938,7 +1979,7 @@ client.on('interactionCreate', async interaction => {
     }
 
     // 8. /leaderboard Command
-    if (commandName === 'leaderboard') {
+    if (commandName === 'leaderboard' || commandName === 'classement') {
         await interaction.deferReply({ ephemeral: false });
 
         const isEn = (await getUserLang(interaction.user.id)) === 'en';
@@ -1948,65 +1989,54 @@ client.on('interactionCreate', async interaction => {
             const users = (await knex('users').select()) || [];
             
             const candidateIds = new Set(followed.map(f => f.riot_id).filter(Boolean));
-            
-            // Also include linked Riot users
-            for (const u of users) {
+            users.forEach(u => {
                 if (u.riot_auth) {
-                    try {
-                        const s = decryptData(u.riot_auth);
-                        if (s?.username && s.username.includes('#')) {
-                            candidateIds.add(s.username);
-                        }
-                    } catch (e) {}
+                    const s = decryptData(u.riot_auth);
+                    if (s?.username && s.username.includes('#')) candidateIds.add(s.username);
                 }
-            }
+            });
 
-            const uniqueRiotIds = [...candidateIds];
-
-            if (uniqueRiotIds.length === 0) {
+            if (candidateIds.size === 0) {
                 return interaction.editReply({
                     content: isEn 
-                        ? `🏆 No tracked players found in database. Link your account with **/login** or follow players on the website!`
-                        : `🏆 Aucun joueur surveillé n'est encore enregistré dans la base de données. Liez votre compte avec **/login** ou suivez des joueurs sur le site !`
+                        ? `ℹ️ **No players followed on this server.** Use **/follow player: Player#TAG** to add players to the leaderboard!` 
+                        : `ℹ️ **Aucun joueur suivi sur ce serveur.** Utilisez **/follow player: Pseudo#TAG** pour ajouter des joueurs au classement !`
                 });
             }
 
             const leaderboardList = [];
-
-            for (const riotId of uniqueRiotIds.slice(0, 10)) {
-                const [name, tag] = riotId.split('#');
-                if (!name || !tag) continue;
+            for (const rId of candidateIds) {
+                const [n, t] = rId.split('#');
+                if (!n || !t) continue;
                 try {
-                    const mmrRes = await henrikApi.get(`/valorant/v2/mmr/eu/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null);
-                    const currentData = mmrRes?.data?.data?.current_data;
-                    if (currentData) {
+                    const data = await getPlayerHistoryData(n.trim(), t.trim(), false);
+                    if (data?.current_tier_patched) {
+                        const rr = data.current_tier_ranking || 0;
+                        const tierNum = data.current_tier || 0;
                         leaderboardList.push({
-                            riotId,
-                            tierName: currentData.currenttierpatched || 'Unrated',
-                            tier: currentData.currenttier || 0,
-                            rr: currentData.ranking_in_tier || 0,
-                            elo: currentData.elo || 0
+                            riotId: rId,
+                            tierName: data.current_tier_patched,
+                            tierNum,
+                            rr,
+                            elo: tierNum * 100 + rr
                         });
                     }
                 } catch (e) {}
-                await sleep(500);
+                await sleep(200);
             }
 
             if (leaderboardList.length === 0) {
-                return interaction.editReply({
-                    content: isEn ? `🏆 Unable to fetch rank data for registered players.` : `🏆 Impossible de récupérer les classements des joueurs enregistrés.`
-                });
+                return interaction.editReply({ content: isEn ? `ℹ️ Could not calculate leaderboard.` : `ℹ️ Impossible de calculer le classement.` });
             }
 
             leaderboardList.sort((a, b) => b.elo - a.elo);
-
             const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
             const lbEmbed = new EmbedBuilder()
-                .setTitle(isEn ? `🏆 SERVER COMPETITIVE LEADERBOARD` : `🏆 CLASSEMENT COMPÉTITIF DU SERVEUR`)
+                .setTitle(isEn ? `🏆 SERVER SQUAD LEADERBOARD` : `🏆 CLASSEMENT COMPÉTITIF DU SERVEUR`)
                 .setColor(0xffb703)
                 .setDescription(
-                    (isEn ? `Tracked players ranked by **Tier & RR** :\n\n` : `Classement des joueurs suivis ordonné par **Rang & RR** :\n\n`) +
+                    (isEn ? `Followed squad players ranked by **Tier & RR** :\n\n` : `Joueurs suivis du serveur classés par **Rang & RR** :\n\n`) +
                     leaderboardList.map((p, idx) => {
                         const medal = medals[idx] || '▫️';
                         return `${medal} **${idx + 1}. ${p.riotId}** — **${p.tierName}** (${p.rr} RR)`;
@@ -2025,12 +2055,12 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // 9. /session Command (Past 24h Session Summary)
+    // 9. /session Command
     if (commandName === 'session') {
         await interaction.deferReply({ ephemeral: false });
 
         const isEn = (await getUserLang(interaction.user.id)) === 'en';
-        let targetRiotId = interaction.options.getString('joueur');
+        let targetRiotId = interaction.options.getString('player') || interaction.options.getString('joueur');
 
         if (!targetRiotId) {
             const user = await knex('users').where({ discord_id: interaction.user.id }).first();
@@ -2046,7 +2076,7 @@ client.on('interactionCreate', async interaction => {
 
         if (!targetRiotId || !targetRiotId.includes('#')) {
             return interaction.editReply({
-                content: isEn ? `❌ **Please specify a player :** \`/session joueur: Player#TAG\`` : `❌ **Veuillez préciser un joueur :** \`/session joueur: Pseudo#TAG\``
+                content: isEn ? `❌ **Please specify a player :** \`/session player: Player#TAG\`` : `❌ **Veuillez préciser un joueur :** \`/session player: Pseudo#TAG\``
             });
         }
 
@@ -2062,12 +2092,113 @@ client.on('interactionCreate', async interaction => {
         return interaction.editReply({ embeds: [report] });
     }
 
-    // 10. /language or /langue Command
+    // 10. /follow Command
+    if (commandName === 'follow') {
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
+        const playerArg = interaction.options.getString('player') || interaction.options.getString('joueur');
+        if (!playerArg || !playerArg.includes('#')) {
+            return interaction.reply({
+                content: isEn ? `❌ **Please specify a valid Riot ID :** \`/follow player: Player#TAG\`` : `❌ **Veuillez préciser un identifiant valide :** \`/follow player: Pseudo#TAG\``,
+                ephemeral: true
+            });
+        }
+        
+        let user = await knex('users').where({ discord_id: interaction.user.id }).first();
+        if (!user) {
+            await knex('users').insert({
+                discord_id: interaction.user.id,
+                username: interaction.user.username,
+                avatar: interaction.user.displayAvatarURL(),
+                discord_channel_id: interaction.channel.id
+            });
+            user = await knex('users').where({ discord_id: interaction.user.id }).first();
+        } else if (!user.discord_channel_id) {
+            await knex('users').where({ discord_id: interaction.user.id }).update({ discord_channel_id: interaction.channel.id });
+        }
+
+        const existing = await knex('followed_players').where({ user_id: user.id, riot_id: playerArg.trim() }).first();
+        if (!existing) {
+            await knex('followed_players').insert({
+                user_id: user.id,
+                guild_id: interaction.guildId || null,
+                riot_id: playerArg.trim()
+            });
+        }
+
+        return interaction.reply({
+            content: isEn
+                ? `✅ **Now following ${playerArg.trim()}!** Match summaries will automatically be posted in <#${interaction.channel.id}>.`
+                : `✅ **Joueur ${playerArg.trim()} désormais suivi !** Les résumés de match seront automatiquement envoyés dans <#${interaction.channel.id}>.`,
+            ephemeral: true
+        });
+    }
+
+    // 11. /unfollow Command
+    if (commandName === 'unfollow') {
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
+        const playerArg = interaction.options.getString('player') || interaction.options.getString('joueur');
+        if (!playerArg) {
+            return interaction.reply({ content: isEn ? `❌ **Please specify a player to unfollow.**` : `❌ **Veuillez préciser un joueur.**`, ephemeral: true });
+        }
+        const user = await knex('users').where({ discord_id: interaction.user.id }).first();
+        if (user) {
+            await knex('followed_players').where({ user_id: user.id, riot_id: playerArg.trim() }).del();
+        }
+        return interaction.reply({
+            content: isEn ? `🗑️ **Unfollowed ${playerArg.trim()}.**` : `🗑️ **Joueur ${playerArg.trim()} retiré du suivi.**`,
+            ephemeral: true
+        });
+    }
+
+    // 12. /help Command
+    if (commandName === 'help') {
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
+        const helpEmbed = new EmbedBuilder()
+            .setTitle(isEn ? '⚡ RADIANITEBOT // COMMANDS & FEATURES' : '⚡ RADIANITEBOT // COMMANDES & FONCTIONNALITÉS')
+            .setColor(0x00f5d4)
+            .setDescription(
+                isEn
+                    ? `**Official Valorant telemetry, store radar and match analysis.**\n\n` +
+                      `📊 **/history [player] [mode]** • 50+ Match history, 5-game net RR Wheel, and interactive scoreboards.\n` +
+                      `🛒 **/store** • Live 24h rotating skin shop, wallet balances and Night Market discounts.\n` +
+                      `📈 **/session [player]** • Past 24h match performance recap, net RR win/loss and K/D.\n` +
+                      `🔍 **/scout [player]** • Live MMR, rank telemetry, headshot % and favorite weapons.\n` +
+                      `🏆 **/leaderboard** • Server competitive squad standings.\n` +
+                      `👥 **/follow [player]** • Follow players to get automated channel alerts upon match end.\n` +
+                      `🗑️ **/unfollow [player]** • Stop following a player.\n` +
+                      `🔔 **/setchannel [channel]** • Set target channel for automated match alerts.\n` +
+                      `⭐ **/wishlist** • Track skins for instant private DM alerts.\n` +
+                      `🌐 **/language** • Change bot language.`
+                    : `**Télémétrie Valorant officielle, radar de boutique et analyse de parties.**\n\n` +
+                      `📊 **/history [joueur] [mode]** • Historique 50+ matchs, roue RR 5 parties et scoreboards complets.\n` +
+                      `🛒 **/store** • Boutique du jour 24h en direct, soldes et Marché Nocturne.\n` +
+                      `📈 **/session [joueur]** • Rapport de performance des dernières 24h avec gain/perte net de RR.\n` +
+                      `🔍 **/scout [joueur]** • MMR en direct, statistiques détaillées et armes favorites.\n` +
+                      `🏆 **/leaderboard** • Classement compétitif des membres du serveur.\n` +
+                      `👥 **/follow [joueur]** • Suivre un joueur pour recevoir des alertes automatiques en fin de partie.\n` +
+                      `🗑️ **/unfollow [joueur]** • Arrêter de suivre un joueur.\n` +
+                      `🔔 **/setchannel [salon]** • Définir le salon des alertes automatiques.\n` +
+                      `⭐ **/wishlist** • Ajouter des skins pour recevoir des alertes en MP.\n` +
+                      `🌐 **/language** • Changer la langue du bot.`
+            )
+            .setFooter({ text: 'RadianiteDB Protocol • https://radianitedb.lol' })
+            .setTimestamp();
+        return interaction.reply({ embeds: [helpEmbed], ephemeral: true });
+    }
+
+    // 13. /language Command
     if (commandName === 'language' || commandName === 'langue') {
-        const chosenLang = interaction.options.getString('langue') || 'fr';
+        const chosenLang = interaction.options.getString('lang') || interaction.options.getString('langue') || 'en';
         const discord_id = interaction.user.id;
 
         try {
+            if (interaction.guildId) {
+                await knex('guild_configs').insert({
+                    guild_id: interaction.guildId,
+                    guild_name: interaction.guild?.name || 'Discord Server',
+                    language: chosenLang
+                });
+            }
             const user = await knex('users').where({ discord_id }).first();
             if (user) {
                 await knex('users').where({ discord_id }).update({ language: chosenLang });
@@ -2080,25 +2211,25 @@ client.on('interactionCreate', async interaction => {
                 });
             }
 
-            const isFr = chosenLang === 'fr';
-            return interaction.reply({
-                content: isFr 
-                    ? `🇫🇷 **Langue définie sur Français !** Vos alertes de match et notifications de salon seront envoyées en français.`
-                    : `🇺🇸 **Language set to English!** Your match alerts and channel notifications will now be sent in English.`,
-                ephemeral: true
-            });
+            const msgs = {
+                en: '🇺🇸 **Language set to English!** Your match alerts and channel notifications will now be sent in English.',
+                fr: '🇫🇷 **Langue définie sur Français !** Vos alertes de match et notifications de salon seront envoyées en français.',
+                es: '🇪🇸 **¡Idioma establecido en Español!** Las alertas se enviarán en español.',
+                de: '🇩🇪 **Sprache auf Deutsch eingestellt!** Benachrichtigungen werden auf Deutsch gesendet.'
+            };
+            return interaction.reply({ content: msgs[chosenLang] || msgs.en, ephemeral: true });
         } catch (err) {
             console.error('[RadianiteBot] Erreur /language:', err);
             return interaction.reply({ content: 'Une erreur est survenue lors de la configuration de la langue.', ephemeral: true });
         }
     }
 
-    // 11. /history or /historique Command
+    // 14. /history Command
     if (commandName === 'history' || commandName === 'historique') {
         await interaction.deferReply({ ephemeral: false });
 
         const isEn = (await getUserLang(interaction.user.id)) === 'en';
-        let targetRiotId = interaction.options.getString('joueur');
+        let targetRiotId = interaction.options.getString('player') || interaction.options.getString('joueur');
         const mode = interaction.options.getString('mode') || 'competitive';
 
         if (!targetRiotId) {
@@ -2116,8 +2247,8 @@ client.on('interactionCreate', async interaction => {
         if (!targetRiotId || !targetRiotId.includes('#')) {
             return interaction.editReply({
                 content: isEn 
-                    ? `❌ **Please specify a full Riot ID :** \`/history joueur: Player#TAG\` (e.g. \`JL Pa1ze#TTV\`)` 
-                    : `❌ **Veuillez préciser un identifiant Riot complet :** \`/history joueur: Pseudo#TAG\` (ex: \`JL Pa1ze#TTV\`)`
+                    ? `❌ **Please specify a full Riot ID :** \`/history player: Player#TAG\` (e.g. \`TenZ#SEN\`)` 
+                    : `❌ **Veuillez préciser un identifiant Riot complet :** \`/history player: Pseudo#TAG\` (ex: \`TenZ#SEN\`)`
             });
         }
 

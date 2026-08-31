@@ -36,6 +36,19 @@ async function initDatabase() {
                 meta TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS guild_configs (
+                guild_id VARCHAR(64) PRIMARY KEY,
+                guild_name VARCHAR(128),
+                guild_icon VARCHAR(256),
+                channel_id VARCHAR(64),
+                language VARCHAR(10) DEFAULT 'en',
+                notify_mentions BOOLEAN DEFAULT true,
+                notify_rankup_only BOOLEAN DEFAULT false,
+                show_rank_wheel BOOLEAN DEFAULT true,
+                notify_game_modes TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         `);
     } catch (err) {}
 }
@@ -264,6 +277,61 @@ function knex(tableName) {
         };
     }
 
+    if (tableName === 'guild_configs') {
+        return {
+            where: (filter) => ({
+                first: async () => {
+                    const keys = Object.keys(filter);
+                    const values = Object.values(filter);
+                    const whereClause = keys.map((k, i) => `${k} = $${i + 1}`).join(' AND ');
+                    const res = await pool.query(`SELECT * FROM guild_configs WHERE ${whereClause} LIMIT 1`, values);
+                    return res.rows[0] || null;
+                },
+                select: async () => {
+                    const keys = Object.keys(filter);
+                    const values = Object.values(filter);
+                    const whereClause = keys.map((k, i) => `${k} = $${i + 1}`).join(' AND ');
+                    const res = await pool.query(`SELECT * FROM guild_configs WHERE ${whereClause}`, values);
+                    return res.rows;
+                },
+                update: async (updateObj) => {
+                    const filterKeys = Object.keys(filter);
+                    const filterValues = Object.values(filter);
+                    const updateKeys = Object.keys(updateObj);
+                    const updateValues = Object.values(updateObj);
+                    const setClause = updateKeys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+                    const whereClause = filterKeys.map((k, i) => `${k} = $${updateKeys.length + i + 1}`).join(' AND ');
+                    const res = await pool.query(`UPDATE guild_configs SET ${setClause} WHERE ${whereClause}`, [...updateValues, ...filterValues]);
+                    return res.rowCount;
+                },
+                del: async () => {
+                    const keys = Object.keys(filter);
+                    const values = Object.values(filter);
+                    const whereClause = keys.map((k, i) => `${k} = $${i + 1}`).join(' AND ');
+                    const res = await pool.query(`DELETE FROM guild_configs WHERE ${whereClause}`, values);
+                    return res.rowCount;
+                }
+            }),
+            select: async () => {
+                const res = await pool.query(`SELECT * FROM guild_configs`);
+                return res.rows;
+            },
+            insert: async (newRecord) => {
+                const keys = Object.keys(newRecord);
+                const values = Object.values(newRecord);
+                const cols = keys.join(', ');
+                const params = keys.map((_, i) => `$${i + 1}`).join(', ');
+                const updateSets = keys.map(k => `${k} = EXCLUDED.${k}`).join(', ');
+                const res = await pool.query(`
+                    INSERT INTO guild_configs (${cols}) VALUES (${params}) 
+                    ON CONFLICT (guild_id) DO UPDATE SET ${updateSets}
+                    RETURNING *
+                `, values);
+                return res.rows;
+            }
+        };
+    }
+
     return {
         where: () => ({ first: async () => null, select: async () => [], update: async () => 0, del: async () => 0 }),
         select: async () => [],
@@ -272,3 +340,4 @@ function knex(tableName) {
 }
 
 module.exports = { knex, pool };
+
