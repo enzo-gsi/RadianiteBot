@@ -169,17 +169,53 @@ const commands = [
         ]
     },
     {
-        name: 'langue',
-        description: 'Choisir la langue des messages du bot (Français / English).',
+        name: 'history',
+        description: 'Historique des matchs (5 par page), évolution RR, roue de rang et scoreboards détaillés.',
         options: [
             {
-                name: 'langue',
-                description: 'Sélectionnez Français ou English',
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
                 type: ApplicationCommandOptionType.String,
-                required: true,
+                required: false
+            },
+            {
+                name: 'mode',
+                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
+                type: ApplicationCommandOptionType.String,
+                required: false,
                 choices: [
-                    { name: '🇫🇷 Français', value: 'fr' },
-                    { name: '🇺🇸 English', value: 'en' }
+                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
+                    { name: '🌐 Tous les modes (All)', value: 'all' },
+                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
+                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
+                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
+                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
+                ]
+            }
+        ]
+    },
+    {
+        name: 'historique',
+        description: 'Historique des matchs (5 par page), évolution RR et scoreboards (alias /history).',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            },
+            {
+                name: 'mode',
+                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
+                type: ApplicationCommandOptionType.String,
+                required: false,
+                choices: [
+                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
+                    { name: '🌐 Tous les modes (All)', value: 'all' },
+                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
+                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
+                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
+                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
                 ]
             }
         ]

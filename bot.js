@@ -265,17 +265,53 @@ const commands = [
         ]
     },
     {
-        name: 'langue',
-        description: 'Choisir la langue des messages du bot (Français / English).',
+        name: 'history',
+        description: 'Historique des matchs (5 par page), évolution RR, roue de rang et scoreboards détaillés.',
         options: [
             {
-                name: 'langue',
-                description: 'Sélectionnez Français ou English',
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
                 type: ApplicationCommandOptionType.String,
-                required: true,
+                required: false
+            },
+            {
+                name: 'mode',
+                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
+                type: ApplicationCommandOptionType.String,
+                required: false,
                 choices: [
-                    { name: '🇫🇷 Français', value: 'fr' },
-                    { name: '🇺🇸 English', value: 'en' }
+                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
+                    { name: '🌐 Tous les modes (All)', value: 'all' },
+                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
+                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
+                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
+                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
+                ]
+            }
+        ]
+    },
+    {
+        name: 'historique',
+        description: 'Historique des matchs (5 par page), évolution RR et scoreboards (alias /history).',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            },
+            {
+                name: 'mode',
+                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
+                type: ApplicationCommandOptionType.String,
+                required: false,
+                choices: [
+                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
+                    { name: '🌐 Tous les modes (All)', value: 'all' },
+                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
+                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
+                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
+                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
                 ]
             }
         ]
@@ -317,13 +353,13 @@ async function incrementBotStat(key, amount = 1) {
         if (existing) {
             await knex('bot_analytics').where({ key }).update({
                 count: parseInt(existing.count || 0) + amount,
-                updated_at: new Date()
+                updated_at: knex.fn.now()
             });
         } else {
             await knex('bot_analytics').insert({
                 key,
                 count: amount,
-                updated_at: new Date()
+                updated_at: knex.fn.now()
             });
         }
     } catch (e) {}
@@ -345,14 +381,14 @@ async function syncGuildsAnalytics() {
             await knex('bot_analytics').where({ key: 'bot_guilds' }).update({
                 count: guilds.length,
                 meta: JSON.stringify(guilds),
-                updated_at: new Date()
+                updated_at: knex.fn.now()
             });
         } else {
             await knex('bot_analytics').insert({
                 key: 'bot_guilds',
                 count: guilds.length,
                 meta: JSON.stringify(guilds),
-                updated_at: new Date()
+                updated_at: knex.fn.now()
             });
         }
     } catch (e) {}
@@ -728,6 +764,434 @@ async function generateSessionReport(targetRiotId, isEn = false) {
     }
 }
 
+// History Data Cache Map (key: 'name#tag' -> { matches, mmrHistory, currentMmr, timestamp })
+const historyCacheMap = new Map();
+
+async function getPlayerHistoryData(name, tag, forceReload = false) {
+    const key = `${name.toLowerCase()}#${tag.toLowerCase()}`;
+    const now = Date.now();
+    if (!forceReload && historyCacheMap.has(key)) {
+        const cached = historyCacheMap.get(key);
+        if (now - cached.timestamp < 180000) { // 3 minutes cache
+            return cached;
+        }
+    }
+
+    // Determine region
+    let region = 'eu';
+    try {
+        const accRes = await henrikApi.get(`/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null);
+        if (accRes?.data?.data?.region) {
+            region = accRes.data.data.region.toLowerCase();
+        }
+    } catch (e) {}
+
+    // Fetch up to 20 matches & MMR history concurrently
+    const [matchesRes, mmrHistRes, mmrV2Res] = await Promise.all([
+        henrikApi.get(`/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=20`).catch(() => null),
+        henrikApi.get(`/valorant/v1/mmr-history/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null),
+        henrikApi.get(`/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null)
+    ]);
+
+    const matches = matchesRes?.data?.data || [];
+    const mmrHistory = mmrHistRes?.data?.data || [];
+    const currentMmr = mmrV2Res?.data?.data || null;
+
+    const result = {
+        name,
+        tag,
+        region,
+        matches,
+        mmrHistory,
+        currentMmr,
+        timestamp: now
+    };
+
+    historyCacheMap.set(key, result);
+    return result;
+}
+
+function buildHistoryPagePayload(historyData, page = 1, mode = 'competitive', isEn = false) {
+    const { name, tag, matches, mmrHistory, currentMmr } = historyData;
+    const targetRiotId = `${name}#${tag}`;
+
+    // Filter matches by mode
+    const filteredMatches = matches.filter(m => {
+        if (!m.metadata) return false;
+        const mMode = (m.metadata.mode || m.metadata.queue || '').toLowerCase();
+        if (mode === 'all') return true;
+        if (mode === 'competitive') return mMode.includes('competitive') || mMode.includes('ranked');
+        if (mode === 'deathmatch') return mMode.includes('deathmatch') && !mMode.includes('team');
+        if (mode === 'teamdeathmatch') return mMode.includes('teamdeathmatch') || mMode.includes('hurm') || mMode.includes('team_deathmatch');
+        if (mode === 'swiftplay') return mMode.includes('swiftplay');
+        if (mode === 'unrated') return mMode.includes('unrated');
+        return true;
+    });
+
+    const pageSize = 5;
+    const totalMatches = filteredMatches.length;
+    const totalPages = Math.max(1, Math.ceil(totalMatches / pageSize));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const startIdx = (currentPage - 1) * pageSize;
+    const pageMatches = filteredMatches.slice(startIdx, startIdx + pageSize);
+
+    const modeLabels = {
+        competitive: isEn ? 'Competitive / Ranked' : 'Compétitif / Classé',
+        all: isEn ? 'All Game Modes' : 'Tous les modes',
+        deathmatch: isEn ? 'Deathmatch' : 'Match à Mort',
+        swiftplay: isEn ? 'Swiftplay' : 'Partie Véloce',
+        teamdeathmatch: isEn ? 'Team Deathmatch' : 'Match à Mort par Équipe',
+        unrated: isEn ? 'Unrated' : 'Non-classé'
+    };
+    const activeModeLabel = modeLabels[mode] || mode;
+
+    if (pageMatches.length === 0) {
+        const emptyEmbed = new EmbedBuilder()
+            .setTitle(isEn ? `📜 MATCH HISTORY • ${targetRiotId.toUpperCase()}` : `📜 HISTORIQUE DES MATCHS • ${targetRiotId.toUpperCase()}`)
+            .setColor(0xff4655)
+            .setDescription(
+                isEn 
+                    ? `⚠️ No **${activeModeLabel}** matches found in the last 20 recorded games for **${targetRiotId}**.\n\n` +
+                      `👉 Try running \`/history joueur: ${targetRiotId} mode: all\` to see all game modes.`
+                    : `⚠️ Aucun match **${activeModeLabel}** trouvé parmi les 20 dernières parties de **${targetRiotId}**.\n\n` +
+                      `👉 Essayez \`/history joueur: ${targetRiotId} mode: all\` pour afficher tous les modes.`
+            )
+            .setFooter({ text: 'RadianiteDB Telemetry Engine' })
+            .setTimestamp();
+
+        return { embeds: [emptyEmbed], components: [] };
+    }
+
+    // Compute stats for current 5-match slice
+    let sliceWins = 0, sliceLosses = 0;
+    let netSliceRR = 0;
+    let hasRanked = false;
+    let latestTierNum = currentMmr?.current_data?.currenttier || 18;
+    let latestTierName = currentMmr?.current_data?.currenttierpatched || (isEn ? 'Unrated' : 'Non-classé');
+    let latestRR = currentMmr?.current_data?.ranking_in_tier ?? 50;
+
+    const matchDetailsData = [];
+
+    pageMatches.forEach((m, idx) => {
+        const allPlayers = m.players?.all_players || [];
+        const p = allPlayers.find(x => x.name?.toLowerCase() === name.toLowerCase() && (!x.tag || x.tag?.toLowerCase() === tag.toLowerCase()))
+               || allPlayers.find(x => x.name?.toLowerCase() === name.toLowerCase())
+               || allPlayers[0];
+
+        const rawMode = (m.metadata?.mode || m.metadata?.queue || '').toLowerCase();
+        const isComp = rawMode.includes('competitive') || rawMode.includes('ranked');
+        const isDM = rawMode.includes('deathmatch') && !rawMode.includes('team');
+
+        const team = m.teams?.[p?.team?.toLowerCase()] || { has_won: false, rounds_won: 0, rounds_lost: 0 };
+        const hasWon = team.has_won;
+        if (hasWon) sliceWins++; else sliceLosses++;
+
+        // Find MMR record matching this match
+        const mmrEntry = mmrHistory.find(h => h.match_id === m.metadata?.matchid)
+                      || mmrHistory.find(h => Math.abs((h.date_raw || 0) - (m.metadata?.game_start || 0)) < 3600);
+
+        let matchRRChange = 0;
+        let matchRankText = '';
+        let matchRRText = '';
+
+        if (isComp) {
+            hasRanked = true;
+            if (mmrEntry) {
+                matchRRChange = mmrEntry.mmr_change_to_last_game || 0;
+                netSliceRR += matchRRChange;
+                matchRankText = mmrEntry.currenttierpatched || 'Ranked';
+                matchRRText = `${mmrEntry.ranking_in_tier ?? 0} RR`;
+                if (idx === 0 && mmrEntry.currenttier) {
+                    latestTierNum = mmrEntry.currenttier;
+                    latestTierName = mmrEntry.currenttierpatched;
+                    latestRR = mmrEntry.ranking_in_tier ?? latestRR;
+                }
+            } else if (p?.currenttier_patched) {
+                matchRankText = p.currenttier_patched;
+            }
+        }
+
+        const kills = p?.stats?.kills || 0;
+        const deaths = p?.stats?.deaths || 0;
+        const assists = p?.stats?.assists || 0;
+        const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills;
+        const acs = Math.round((p?.stats?.score || 0) / (m.metadata?.rounds_played || 1));
+        const totalShots = (p?.stats?.headshots || 0) + (p?.stats?.bodyshots || 0) + (p?.stats?.legshots || 0);
+        const hsPercent = totalShots > 0 ? Math.round(((p?.stats?.headshots || 0) / totalShots) * 100) : 0;
+        const damageDelta = (p?.damage_made || 0) - (p?.damage_received || 0);
+        const ddSign = damageDelta > 0 ? `+${damageDelta}` : `${damageDelta}`;
+
+        // Deathmatch placement
+        let dmPlacement = 1;
+        if (isDM) {
+            const sortedDM = [...allPlayers].sort((a, b) => (b.stats?.kills || 0) - (a.stats?.kills || 0));
+            dmPlacement = sortedDM.findIndex(x => x.name?.toLowerCase() === name.toLowerCase()) + 1;
+            if (dmPlacement === 0) dmPlacement = 1;
+        }
+
+        matchDetailsData.push({
+            matchIndex: startIdx + idx,
+            matchId: m.metadata?.matchid,
+            isComp,
+            isDM,
+            hasWon,
+            teamWon: team.rounds_won,
+            teamLost: team.rounds_lost,
+            map: m.metadata?.map || 'Valorant',
+            character: p?.character || 'Agent',
+            gameStart: m.metadata?.game_start || Math.floor(Date.now() / 1000),
+            kills, deaths, assists, kd, acs, hsPercent, ddSign,
+            matchRRChange, matchRankText, matchRRText,
+            dmPlacement, totalPlayers: allPlayers.length || 12
+        });
+    });
+
+    const winRateSlice = Math.round((sliceWins / pageMatches.length) * 100);
+    const netRRString = netSliceRR > 0 ? `+${netSliceRR} RR` : `${netSliceRR} RR`;
+
+    // Dynamic Rank Wheel for this 5-match window
+    const rankWheelUrl = `${YOUR_WEBSITE_URL}/api/rank-wheel?rr=${latestRR}&change=${netSliceRR}&tier=${latestTierNum}&size=360&t=${Date.now()}`;
+
+    const mainEmbed = new EmbedBuilder()
+        .setTitle(isEn ? `📜 MATCH HISTORY • ${targetRiotId.toUpperCase()}` : `📜 HISTORIQUE DES MATCHS • ${targetRiotId.toUpperCase()}`)
+        .setColor(hasRanked ? (netSliceRR >= 0 ? 0x00f5d4 : 0xff4655) : (winRateSlice >= 50 ? 0x00f5d4 : 0xff4655))
+        .setDescription(
+            `🎮 **Mode :** **${activeModeLabel}** • 📄 **Page ${currentPage}/${totalPages}**\n` +
+            `📈 **${isEn ? '5-Match Record' : 'Bilan Page'} :** **${sliceWins}W - ${sliceLosses}L (${winRateSlice}% WR)** ${hasRanked ? `| **${netRRString}**` : ''}\n` +
+            `💎 **${isEn ? 'Current Tier' : 'Rang Actuel'} :** **${latestTierName}** (${latestRR} RR)\n` +
+            `────────────────────────────────────────`
+        )
+        .setThumbnail(hasRanked ? rankWheelUrl : 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
+        .setFooter({ text: isEn ? `RadianiteDB • Click 'Match 1-5' below to view full Scoreboard & Lobby stats` : `RadianiteDB • Cliquez sur 'Match 1-5' ci-dessous pour ouvrir le Scoreboard complet` })
+        .setTimestamp();
+
+    matchDetailsData.forEach((mItem) => {
+        const globalNum = mItem.matchIndex + 1;
+
+        if (mItem.isDM) {
+            const isTop1 = mItem.dmPlacement === 1;
+            mainEmbed.addFields({
+                name: `${isTop1 ? '🏆' : '💀'} ${globalNum}. ${isTop1 ? (isEn ? 'VICTORY (TOP 1)' : 'VICTOIRE (TOP 1)') : `TOP ${mItem.dmPlacement}/${mItem.totalPlayers}`} • ${mItem.map} (${mItem.character}) | <t:${mItem.gameStart}:R>`,
+                value: `🎯 **Score :** **${mItem.kills} Kills / ${mItem.deaths} ${isEn ? 'Deaths' : 'Morts'}** (**${mItem.kd} KD**) | 🎯 **HS :** ${mItem.hsPercent}%\n` +
+                       `────────────────────────────────────────`,
+                inline: false
+            });
+        } else {
+            const icon = mItem.hasWon ? '🟢' : '🔴';
+            const resultLabel = mItem.hasWon ? (isEn ? 'VICTORY' : 'VICTOIRE') : (isEn ? 'DEFEAT' : 'DÉFAITE');
+            const scoreText = `${mItem.teamWon} - ${mItem.teamLost}`;
+            const rankInfo = mItem.isComp && mItem.matchRankText 
+                ? `\n💎 **${isEn ? 'Rank' : 'Rang'} :** ${mItem.matchRankText} (${mItem.matchRRText}) • **${mItem.matchRRChange > 0 ? `+${mItem.matchRRChange}` : mItem.matchRRChange} RR**` 
+                : '';
+
+            mainEmbed.addFields({
+                name: `${icon} ${globalNum}. ${resultLabel} ${scoreText} • ${mItem.map} (${mItem.character}) | <t:${mItem.gameStart}:R>`,
+                value: `⚔️ **K/D/A :** ${mItem.kills}/${mItem.deaths}/${mItem.assists} (**${mItem.kd} KD**) | 💥 **ACS :** ${mItem.acs} | 🎯 **HS :** ${mItem.hsPercent}% | 🛡️ **DDΔ :** ${mItem.ddSign}${rankInfo}\n` +
+                       `────────────────────────────────────────`,
+                inline: false
+            });
+        }
+    });
+
+    // Row 1: Match Scoreboard Expand Buttons
+    const matchButtonsRow = new ActionRowBuilder();
+    pageMatches.forEach((m, idx) => {
+        const globalNum = startIdx + idx + 1;
+        matchButtonsRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`hist_det_${encodeURIComponent(name)}_${encodeURIComponent(tag)}_${currentPage}_${startIdx + idx}_${mode}`)
+                .setLabel(isEn ? `📊 Match ${globalNum}` : `📊 Match ${globalNum}`)
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('🔎')
+        );
+    });
+
+    // Row 2: Pagination & RadianiteDB Link
+    const navRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`hist_page_${encodeURIComponent(name)}_${encodeURIComponent(tag)}_${currentPage - 1}_${mode}`)
+            .setLabel(isEn ? '◀ Previous' : '◀ Précédent')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(currentPage <= 1),
+        new ButtonBuilder()
+            .setCustomId('hist_noop')
+            .setLabel(`${currentPage} / ${totalPages}`)
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true),
+        new ButtonBuilder()
+            .setCustomId(`hist_page_${encodeURIComponent(name)}_${encodeURIComponent(tag)}_${currentPage + 1}_${mode}`)
+            .setLabel(isEn ? 'Next ▶' : 'Suivant ▶')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(currentPage >= totalPages),
+        new ButtonBuilder()
+            .setLabel('RadianiteDB')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`${YOUR_WEBSITE_URL}/?player=${encodeURIComponent(name)}%23${encodeURIComponent(tag)}`)
+            .setEmoji('🌐')
+    );
+
+    return {
+        embeds: [mainEmbed],
+        components: [matchButtonsRow, navRow]
+    };
+}
+
+function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage = 1, mode = 'competitive', isEn = false) {
+    const { name, tag, matches } = historyData;
+
+    // Filter matches to match the list ordering
+    const filteredMatches = matches.filter(m => {
+        if (!m.metadata) return false;
+        const mMode = (m.metadata.mode || m.metadata.queue || '').toLowerCase();
+        if (mode === 'all') return true;
+        if (mode === 'competitive') return mMode.includes('competitive') || mMode.includes('ranked');
+        if (mode === 'deathmatch') return mMode.includes('deathmatch') && !mMode.includes('team');
+        if (mode === 'teamdeathmatch') return mMode.includes('teamdeathmatch') || mMode.includes('hurm') || mMode.includes('team_deathmatch');
+        if (mode === 'swiftplay') return mMode.includes('swiftplay');
+        if (mode === 'unrated') return mMode.includes('unrated');
+        return true;
+    });
+
+    const match = filteredMatches[matchIndex] || matches[0];
+    if (!match) {
+        return {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(isEn ? '❌ Match not found' : '❌ Match introuvable')
+                    .setColor(0xff4655)
+                    .setDescription(isEn ? 'Unable to retrieve data for this match.' : 'Impossible de récupérer les données de cette partie.')
+            ],
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`hist_back_${encodeURIComponent(name)}_${encodeURIComponent(tag)}_${returnPage}_${mode}`)
+                        .setLabel(isEn ? '◀ Back to History' : '◀ Retour à l\'historique')
+                        .setStyle(ButtonStyle.Primary)
+                )
+            ]
+        };
+    }
+
+    const allPlayers = match.players?.all_players || [];
+    const myPlayer = allPlayers.find(x => x.name?.toLowerCase() === name.toLowerCase() && (!x.tag || x.tag?.toLowerCase() === tag.toLowerCase()))
+                  || allPlayers.find(x => x.name?.toLowerCase() === name.toLowerCase())
+                  || allPlayers[0];
+
+    const isDM = (match.metadata?.mode || match.metadata?.queue || '').toLowerCase().includes('deathmatch') && !(match.metadata?.mode || '').toLowerCase().includes('team');
+    const myTeam = match.teams?.[myPlayer?.team?.toLowerCase()] || { has_won: false, rounds_won: 0, rounds_lost: 0 };
+    const hasWon = myTeam.has_won;
+
+    const gameDurationMin = Math.round((match.metadata?.game_length || 0) / 60);
+    const mapName = match.metadata?.map || 'Valorant';
+
+    // Find Match MVP (highest score across all players)
+    const sortedAll = [...allPlayers].sort((a, b) => (b.stats?.score || 0) - (a.stats?.score || 0));
+    const matchMvp = sortedAll[0];
+    const matchMvpAcs = Math.round((matchMvp?.stats?.score || 0) / (match.metadata?.rounds_played || 1));
+
+    const scoreboardEmbed = new EmbedBuilder()
+        .setTitle(
+            isEn 
+                ? `📊 MATCH SCOREBOARD • ${mapName.toUpperCase()} (${match.metadata?.mode || 'Game'})`
+                : `📊 SCOREBOARD DU MATCH • ${mapName.toUpperCase()} (${match.metadata?.mode || 'Partie'})`
+        )
+        .setColor(isDM ? 0xffb703 : (hasWon ? 0x00f5d4 : 0xff4655))
+        .setDescription(
+            (isDM
+                ? `🎮 **Mode :** Match à Mort (Deathmatch) • ⏱️ **Durée :** ${gameDurationMin} min\n` +
+                  `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n` +
+                  `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
+                  `────────────────────────────────────────`
+                : `🏆 **Résultat :** **${hasWon ? (isEn ? 'VICTORY' : 'VICTOIRE') : (isEn ? 'DEFEAT' : 'DÉFAITE')}** (${myTeam.rounds_won} - ${myTeam.rounds_lost})\n` +
+                  `⏱️ **Durée :** ${gameDurationMin} min • **Rounds joués :** ${match.metadata?.rounds_played || 0}\n` +
+                  `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n` +
+                  `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
+                  `────────────────────────────────────────`
+            )
+        )
+        .setThumbnail(myPlayer?.assets?.agent?.small || 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
+        .setFooter({ text: isEn ? `RadianiteDB Scoreboard Intelligence • Match #${matchIndex + 1}` : `RadianiteDB Scoreboard • Match #${matchIndex + 1}` })
+        .setTimestamp(new Date((match.metadata?.game_start || 0) * 1000));
+
+    if (isDM) {
+        // Single Deathmatch Leaderboard
+        const dmLeaderboardLines = sortedAll.map((p, idx) => {
+            const isSelf = p.name?.toLowerCase() === name.toLowerCase();
+            const kills = p.stats?.kills || 0;
+            const deaths = p.stats?.deaths || 0;
+            const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills;
+            const totalShots = (p.stats?.headshots || 0) + (p.stats?.bodyshots || 0) + (p.stats?.legshots || 0);
+            const hs = totalShots > 0 ? Math.round(((p.stats?.headshots || 0) / totalShots) * 100) : 0;
+            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+
+            return `${medal} ${isSelf ? `👉 **${p.name}#${p.tag}**` : `**${p.name}#${p.tag}**`} (${p.character}) — **${kills}K / ${deaths}D** (${kd} KD) • ${hs}% HS`;
+        });
+
+        scoreboardEmbed.addFields({
+            name: isEn ? `🎯 FINAL STANDINGS (${allPlayers.length} Players)` : `🎯 CLASSEMENT FINAL (${allPlayers.length} Joueurs)`,
+            value: dmLeaderboardLines.join('\n') || (isEn ? 'No player stats available' : 'Aucune stat disponible'),
+            inline: false
+        });
+
+    } else {
+        // 5v5 Standard Teams (Blue & Red)
+        const blueTeamPlayers = allPlayers.filter(p => p.team?.toLowerCase() === 'blue').sort((a, b) => (b.stats?.score || 0) - (a.stats?.score || 0));
+        const redTeamPlayers = allPlayers.filter(p => p.team?.toLowerCase() === 'red').sort((a, b) => (b.stats?.score || 0) - (a.stats?.score || 0));
+        const blueTeamObj = match.teams?.blue || { rounds_won: 0, has_won: false };
+        const redTeamObj = match.teams?.red || { rounds_won: 0, has_won: false };
+
+        const formatPlayerLine = (p) => {
+            const isSelf = p.name?.toLowerCase() === name.toLowerCase();
+            const isMvp = p.name?.toLowerCase() === matchMvp?.name?.toLowerCase();
+            const kills = p.stats?.kills || 0;
+            const deaths = p.stats?.deaths || 0;
+            const assists = p.stats?.assists || 0;
+            const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills;
+            const acs = Math.round((p.stats?.score || 0) / (match.metadata?.rounds_played || 1));
+            const totalShots = (p.stats?.headshots || 0) + (p.stats?.bodyshots || 0) + (p.stats?.legshots || 0);
+            const hs = totalShots > 0 ? Math.round(((p.stats?.headshots || 0) / totalShots) * 100) : 0;
+            const tierStr = p.currenttier_patched ? ` • *${p.currenttier_patched}*` : '';
+
+            return `${isSelf ? '👉 ' : ''}**${p.name}#${p.tag}** (${p.character}${tierStr}) ${isMvp ? '👑' : ''}\n` +
+                   `└ ⚔️ **${kills}/${deaths}/${assists}** (${kd} KD) • **${acs} ACS** • ${hs}% HS`;
+        };
+
+        const blueLines = blueTeamPlayers.map(formatPlayerLine).join('\n') || (isEn ? 'No players' : 'Aucun joueur');
+        const redLines = redTeamPlayers.map(formatPlayerLine).join('\n') || (isEn ? 'No players' : 'Aucun joueur');
+
+        scoreboardEmbed.addFields(
+            {
+                name: `🔵 ${isEn ? 'BLUE TEAM' : 'ÉQUIPE BLEUE'} (${blueTeamObj.rounds_won} Rounds ${blueTeamObj.has_won ? '🏆' : ''})`,
+                value: blueLines,
+                inline: false
+            },
+            {
+                name: `🔴 ${isEn ? 'RED TEAM' : 'ÉQUIPE ROUGE'} (${redTeamObj.rounds_won} Rounds ${redTeamObj.has_won ? '🏆' : ''})`,
+                value: redLines,
+                inline: false
+            }
+        );
+    }
+
+    const backButtonRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`hist_back_${encodeURIComponent(name)}_${encodeURIComponent(tag)}_${returnPage}_${mode}`)
+            .setLabel(isEn ? `◀ Back to History (Page ${returnPage})` : `◀ Retour à l'historique (Page ${returnPage})`)
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('📜'),
+        new ButtonBuilder()
+            .setLabel(isEn ? 'View on RadianiteDB' : 'Voir sur RadianiteDB')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`${YOUR_WEBSITE_URL}/?player=${encodeURIComponent(name)}%23${encodeURIComponent(tag)}`)
+            .setEmoji('🌐')
+    );
+
+    return {
+        embeds: [scoreboardEmbed],
+        components: [backButtonRow]
+    };
+}
+
 // Handle Slash Command, Button & Modal Interactions
 client.on('interactionCreate', async interaction => {
     // 🔘 Handle Button: Open Riot Link Modal
@@ -748,6 +1212,78 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.showModal(modal);
         return;
+    }
+
+    // 🔘 Handle Match History Pagination & Detail Buttons
+    if (interaction.isButton()) {
+        if (interaction.customId === 'hist_noop') {
+            await interaction.deferUpdate().catch(() => {});
+            return;
+        }
+
+        if (interaction.customId.startsWith('hist_page_')) {
+            await interaction.deferUpdate().catch(() => {});
+            const isEn = (await getUserLang(interaction.user.id)) === 'en';
+            const parts = interaction.customId.split('_');
+            const encName = parts[2];
+            const encTag = parts[3];
+            const targetPage = parseInt(parts[4]) || 1;
+            const mode = parts[5] || 'competitive';
+            const name = decodeURIComponent(encName);
+            const tag = decodeURIComponent(encTag);
+
+            try {
+                const historyData = await getPlayerHistoryData(name, tag, false);
+                const payload = buildHistoryPagePayload(historyData, targetPage, mode, isEn);
+                await interaction.editReply(payload);
+            } catch (err) {
+                console.error('[RadianiteBot] Error updating history page:', err);
+            }
+            return;
+        }
+
+        if (interaction.customId.startsWith('hist_det_')) {
+            await interaction.deferUpdate().catch(() => {});
+            const isEn = (await getUserLang(interaction.user.id)) === 'en';
+            const parts = interaction.customId.split('_');
+            const encName = parts[2];
+            const encTag = parts[3];
+            const returnPage = parseInt(parts[4]) || 1;
+            const matchIndex = parseInt(parts[5]) || 0;
+            const mode = parts[6] || 'competitive';
+            const name = decodeURIComponent(encName);
+            const tag = decodeURIComponent(encTag);
+
+            try {
+                const historyData = await getPlayerHistoryData(name, tag, false);
+                const payload = buildMatchDetailsPayload(historyData, matchIndex, returnPage, mode, isEn);
+                await interaction.editReply(payload);
+            } catch (err) {
+                console.error('[RadianiteBot] Error showing match details:', err);
+            }
+            return;
+        }
+
+        if (interaction.customId.startsWith('hist_back_')) {
+            await interaction.deferUpdate().catch(() => {});
+            const isEn = (await getUserLang(interaction.user.id)) === 'en';
+            const parts = interaction.customId.split('_');
+            const encName = parts[2];
+            const encTag = parts[3];
+            const returnPage = parseInt(parts[4]) || 1;
+            const mode = parts[5] || 'competitive';
+            const name = decodeURIComponent(encName);
+            const tag = decodeURIComponent(encTag);
+
+            try {
+                const historyData = await getPlayerHistoryData(name, tag, false);
+                const payload = buildHistoryPagePayload(historyData, returnPage, mode, isEn);
+                await interaction.editReply(payload);
+            } catch (err) {
+                console.error('[RadianiteBot] Error returning to history page:', err);
+            }
+            return;
+        }
     }
 
     // 📋 Handle Modal Submission: Save Persistent Riot Session
@@ -1297,8 +1833,8 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // 8. /classement & /leaderboard Command
-    if (commandName === 'classement' || commandName === 'leaderboard') {
+    // 8. /leaderboard Command
+    if (commandName === 'leaderboard') {
         await interaction.deferReply({ ephemeral: false });
 
         const isEn = (await getUserLang(interaction.user.id)) === 'en';
@@ -1380,7 +1916,7 @@ client.on('interactionCreate', async interaction => {
             return interaction.editReply({ embeds: [lbEmbed] });
 
         } catch (err) {
-            console.error('[RadianiteBot] Erreur /classement:', err);
+            console.error('[RadianiteBot] Error /leaderboard:', err);
             return interaction.editReply({ content: isEn ? `❌ Error calculating leaderboard.` : `❌ Erreur lors du calcul du classement.` });
         }
     }
@@ -1450,6 +1986,66 @@ client.on('interactionCreate', async interaction => {
         } catch (err) {
             console.error('[RadianiteBot] Erreur /language:', err);
             return interaction.reply({ content: 'Une erreur est survenue lors de la configuration de la langue.', ephemeral: true });
+        }
+    }
+
+    // 11. /history or /historique Command
+    if (commandName === 'history' || commandName === 'historique') {
+        await interaction.deferReply({ ephemeral: false });
+
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
+        let targetRiotId = interaction.options.getString('joueur');
+        const mode = interaction.options.getString('mode') || 'competitive';
+
+        if (!targetRiotId) {
+            const user = await knex('users').where({ discord_id: interaction.user.id }).first();
+            if (user?.riot_auth) {
+                const s = decryptData(user.riot_auth);
+                if (s?.username && s.username.includes('#')) targetRiotId = s.username;
+            }
+            if (!targetRiotId) {
+                const sub = await knex('followed_players').where({ user_id: user?.id || 0 }).first();
+                if (sub) targetRiotId = sub.riot_id;
+            }
+        }
+
+        if (!targetRiotId || !targetRiotId.includes('#')) {
+            return interaction.editReply({
+                content: isEn 
+                    ? `❌ **Please specify a full Riot ID :** \`/history joueur: Player#TAG\` (e.g. \`JL Pa1ze#TTV\`)` 
+                    : `❌ **Veuillez préciser un identifiant Riot complet :** \`/history joueur: Pseudo#TAG\` (ex: \`JL Pa1ze#TTV\`)`
+            });
+        }
+
+        const [name, tag] = targetRiotId.split('#');
+        if (!name || !tag) {
+            return interaction.editReply({
+                content: isEn 
+                    ? `❌ **Invalid format.** Please use \`Pseudo#TAG\` (e.g. \`JL Pa1ze#TTV\`).`
+                    : `❌ **Format invalide.** Veuillez utiliser la forme \`Pseudo#TAG\` (ex: \`JL Pa1ze#TTV\`).`
+            });
+        }
+
+        try {
+            const historyData = await getPlayerHistoryData(name.trim(), tag.trim(), false);
+            if (!historyData.matches || historyData.matches.length === 0) {
+                return interaction.editReply({
+                    content: isEn 
+                        ? `ℹ️ **No matches found for ${targetRiotId}.** Check that the Riot ID is correct.`
+                        : `ℹ️ **Aucun match trouvé pour ${targetRiotId}.** Vérifiez l'orthographe du Pseudo et du TAG.`
+                });
+            }
+
+            const payload = buildHistoryPagePayload(historyData, 1, mode, isEn);
+            return interaction.editReply(payload);
+
+        } catch (err) {
+            console.error('[RadianiteBot] Error executing /history:', err);
+            return interaction.editReply({
+                content: isEn 
+                    ? `❌ An error occurred while retrieving match history: ${err.message}` 
+                    : `❌ Une erreur est survenue lors de la récupération de l'historique : ${err.message}`
+            });
         }
     }
 });
