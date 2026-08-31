@@ -1199,30 +1199,7 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
     const matchMvp = sortedAll[0];
     const matchMvpAcs = Math.round((matchMvp?.stats?.score || 0) / (match.metadata?.rounds_played || 1));
 
-    const scoreboardEmbed = new EmbedBuilder()
-        .setTitle(
-            isEn 
-                ? `📊 MATCH SCOREBOARD • ${mapName.toUpperCase()} (${match.metadata?.mode || 'Game'})`
-                : `📊 SCOREBOARD DU MATCH • ${mapName.toUpperCase()} (${match.metadata?.mode || 'Partie'})`
-        )
-        .setColor(isDM ? 0xffb703 : (hasWon ? 0x00f5d4 : 0xff4655))
-        .setDescription(
-            (isDM
-                ? `🎮 **Mode :** Match à Mort (Deathmatch) • ⏱️ **Durée :** ${gameDurationMin} min\n` +
-                  `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n\n` +
-                  `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
-                  `────────────────────────────────────────`
-                : `🏆 **Résultat :** **${hasWon ? (isEn ? 'VICTORY' : 'VICTOIRE') : (isEn ? 'DEFEAT' : 'DÉFAITE')}** (${myTeam.rounds_won} - ${myTeam.rounds_lost})\n` +
-                  `⏱️ **Durée :** ${gameDurationMin} min • **Rounds joués :** ${match.metadata?.rounds_played || 0}\n` +
-                  `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n` +
-                  rankInfoLine +
-                  `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
-                  `────────────────────────────────────────`
-            )
-        )
-        .setThumbnail(rankWheelUrl || myPlayer?.assets?.agent?.small || 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
-        .setFooter({ text: isEn ? `RadianiteDB Scoreboard Intelligence • Match #${matchIndex + 1}` : `RadianiteDB Scoreboard • Match #${matchIndex + 1}` })
-        .setTimestamp(new Date((match.metadata?.game_start || 0) * 1000));
+    let teamsDescriptionSection = '';
 
     if (isDM) {
         // Single Deathmatch Leaderboard
@@ -1240,11 +1217,7 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
         });
 
         const dmTitle = `## 🎯 ${isEn ? `FINAL STANDINGS (${allPlayers.length} PLAYERS)` : `CLASSEMENT FINAL (${allPlayers.length} JOUEURS)`}\n`;
-        scoreboardEmbed.addFields({
-            name: '\u200b',
-            value: dmTitle + (dmLeaderboardLines.join('\n') || (isEn ? 'No player stats available' : 'Aucune stat disponible')),
-            inline: false
-        });
+        teamsDescriptionSection = dmTitle + (dmLeaderboardLines.join('\n') || (isEn ? 'No player stats available' : 'Aucune stat disponible'));
 
     } else {
         // 5v5 Standard Teams (Blue & Red)
@@ -1277,19 +1250,32 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
         const blueTitle = `## 🔵 ${isEn ? 'BLUE TEAM' : 'ÉQUIPE BLEUE'} — ${blueTeamObj.rounds_won} Rounds ${blueTeamObj.has_won ? '🏆' : ''}\n`;
         const redTitle = `## 🔴 ${isEn ? 'RED TEAM' : 'ÉQUIPE ROUGE'} — ${redTeamObj.rounds_won} Rounds ${redTeamObj.has_won ? '🏆' : ''}\n`;
 
-        scoreboardEmbed.addFields(
-            {
-                name: '\u200b',
-                value: blueTitle + blueLines,
-                inline: false
-            },
-            {
-                name: '\u200b',
-                value: redTitle + redLines,
-                inline: false
-            }
-        );
+        teamsDescriptionSection = `${blueTitle}${blueLines}\n${redTitle}${redLines}`;
     }
+
+    const headerSection = isDM
+        ? `🎮 **Mode :** Match à Mort (Deathmatch) • ⏱️ **Durée :** ${gameDurationMin} min\n` +
+          `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n\n` +
+          `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
+          `────────────────────────────────────────\n\n`
+        : `🏆 **Résultat :** **${hasWon ? (isEn ? 'VICTORY' : 'VICTOIRE') : (isEn ? 'DEFEAT' : 'DÉFAITE')}** (${myTeam.rounds_won} - ${myTeam.rounds_lost})\n` +
+          `⏱️ **Durée :** ${gameDurationMin} min • **Rounds joués :** ${match.metadata?.rounds_played || 0}\n` +
+          `🕒 **Date :** <t:${match.metadata?.game_start}:f> (<t:${match.metadata?.game_start}:R>)\n` +
+          rankInfoLine +
+          `⭐ **Match MVP :** **${matchMvp?.name}#${matchMvp?.tag}** (${matchMvp?.character} • **${matchMvpAcs} ACS**)\n` +
+          `────────────────────────────────────────\n\n`;
+
+    const scoreboardEmbed = new EmbedBuilder()
+        .setTitle(
+            isEn 
+                ? `📊 MATCH SCOREBOARD • ${mapName.toUpperCase()} (${match.metadata?.mode || 'Game'})`
+                : `📊 SCOREBOARD DU MATCH • ${mapName.toUpperCase()} (${match.metadata?.mode || 'Partie'})`
+        )
+        .setColor(isDM ? 0xffb703 : (hasWon ? 0x00f5d4 : 0xff4655))
+        .setDescription(headerSection + teamsDescriptionSection)
+        .setThumbnail(rankWheelUrl || myPlayer?.assets?.agent?.small || 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png')
+        .setFooter({ text: isEn ? `RadianiteDB Scoreboard Intelligence • Match #${matchIndex + 1}` : `RadianiteDB Scoreboard • Match #${matchIndex + 1}` })
+        .setTimestamp(new Date((match.metadata?.game_start || 0) * 1000));
 
     const backButtonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
