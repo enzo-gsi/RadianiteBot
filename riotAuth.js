@@ -1,4 +1,3 @@
-const https = require('https');
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -9,29 +8,6 @@ const ALGORITHM = 'aes-256-gcm';
 
 const USER_AGENT = 'RiotClient/104.0.0.2185.1054 rso-auth (Windows;10;;Professional, x64)';
 const CLIENT_PLATFORM = 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9';
-
-// Custom HTTPS Agent with standard modern TLS ciphers
-const tlsAgent = new https.Agent({
-    ciphers: [
-        'TLS_AES_128_GCM_SHA256',
-        'TLS_AES_256_GCM_SHA384',
-        'TLS_CHACHA20_POLY1305_SHA256',
-        'ECDHE-ECDSA-AES128-GCM-SHA256',
-        'ECDHE-RSA-AES128-GCM-SHA256',
-        'ECDHE-ECDSA-AES256-GCM-SHA384',
-        'ECDHE-RSA-AES256-GCM-SHA384',
-        'ECDHE-ECDSA-CHACHA20-POLY1305',
-        'ECDHE-RSA-CHACHA20-POLY1305',
-        'ECDHE-RSA-AES128-SHA',
-        'ECDHE-RSA-AES256-SHA',
-        'AES128-GCM-SHA256',
-        'AES256-GCM-SHA384',
-        'AES128-SHA',
-        'AES256-SHA'
-    ].join(':'),
-    honorCipherOrder: true,
-    minVersion: 'TLSv1.2'
-});
 
 // AES-256-GCM Encrypt
 function encryptData(obj) {
@@ -113,85 +89,66 @@ function extractTokensFromUri(uri) {
 // 1. Direct RSO Login with Username & Password
 async function loginRiotRSO(username, password) {
     try {
-        const cleanedUsername = username.trim();
-        const clientConfigs = [
-            { client_id: 'play-valorant-web-prod', redirect_uri: 'https://playvalorant.com/opt_in', scope: 'account openid' },
-            { client_id: 'riot-client', redirect_uri: 'http://localhost/redirect', scope: 'openid link ban lol_region' }
-        ];
+        // Step A: Initialize Authorization Handshake
+        const initRes = await axios.post('https://auth.riotgames.com/api/v1/authorization', {
+            client_id: 'play-valorant-web-prod',
+            nonce: '1',
+            redirect_uri: 'https://playvalorant.com/opt_in',
+            response_type: 'token id_token',
+            scope: 'account openid'
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': USER_AGENT
+            },
+            validateStatus: () => true
+        });
 
-        let lastResult = null;
+        let cookieMap = parseCookies(initRes.headers['set-cookie']);
 
-        for (const config of clientConfigs) {
-            // Step A: Initialize Authorization Handshake
-            const initRes = await axios.post('https://auth.riotgames.com/api/v1/authorization', {
-                client_id: config.client_id,
-                nonce: '1',
-                redirect_uri: config.redirect_uri,
-                response_type: 'token id_token',
-                scope: config.scope
-            }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': USER_AGENT,
-                    'Accept': 'application/json, text/plain, */*'
-                },
-                httpsAgent: tlsAgent,
-                validateStatus: () => true
-            });
+        // Step B: Submit Credentials (remember: true for persistent session cookies)
+        const authRes = await axios.put('https://auth.riotgames.com/api/v1/authorization', {
+            type: 'auth',
+            username: username.trim(),
+            password: password,
+            remember: true
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Cookie': cookieMapToString(cookieMap),
+                'User-Agent': USER_AGENT
+            },
+            validateStatus: () => true
+        });
 
-            let cookieMap = parseCookies(initRes.headers['set-cookie']);
+        cookieMap = parseCookies(authRes.headers['set-cookie'], cookieMap);
 
-            // Step B: Submit Credentials
-            const authRes = await axios.put('https://auth.riotgames.com/api/v1/authorization', {
-                type: 'auth',
-                username: cleanedUsername,
-                password: password,
-                remember: true
-            }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cookie': cookieMapToString(cookieMap),
-                    'User-Agent': USER_AGENT,
-                    'Accept': 'application/json, text/plain, */*'
-                },
-                httpsAgent: tlsAgent,
-                validateStatus: () => true
-            });
-
-            cookieMap = parseCookies(authRes.headers['set-cookie'], cookieMap);
-
-            if (authRes.data?.type === 'response') {
-                const uri = authRes.data.response?.parameters?.uri;
-                const { accessToken, idToken } = extractTokensFromUri(uri);
-                if (accessToken) {
-                    const sessionData = await buildSessionPayload(accessToken, idToken, cookieMap);
-                    return { success: true, session: sessionData };
-                }
-            } else if (authRes.data?.type === 'multifactor') {
-                const email = authRes.data.multifactor?.email || 'votre adresse email';
-                return {
-                    success: false,
-                    requires2FA: true,
-                    email: email,
-                    cookies: cookieMap
-                };
+        // Check response type
+        if (authRes.data?.type === 'response') {
+            const uri = authRes.data.response?.parameters?.uri;
+            const { accessToken, idToken } = extractTokensFromUri(uri);
+            if (!accessToken) {
+                return { success: false, error: 'missing_token' };
             }
 
-            lastResult = authRes.data;
-            if (authRes.data?.error !== 'auth_failure') {
-                break;
-            }
-        }
+            // Fetch Entitlements, PUUID, and User info
+            const sessionData = await buildSessionPayload(accessToken, idToken, cookieMap);
+            return { success: true, session: sessionData };
 
-        if (lastResult?.error === 'auth_failure') {
-            return { 
-                success: false, 
-                error: 'Identifiant ou mot de passe incorrect.\nℹ️ *Attention : Entrez bien votre **Nom d\'utilisateur de connexion Riot** (celui utilisé sur le launcher Riot Client), et non votre pseudo en jeu (#TAG).*' 
+        } else if (authRes.data?.type === 'multifactor') {
+            const email = authRes.data.multifactor?.email || 'votre email';
+            return {
+                success: false,
+                requires2FA: true,
+                email: email,
+                cookies: cookieMap
             };
-        } else if (lastResult?.error === 'rate_limited') {
+        } else if (authRes.data?.error === 'auth_failure') {
+            return { success: false, error: 'Identifiant ou mot de passe incorrect.' };
+        } else if (authRes.data?.error === 'rate_limited') {
             return { success: false, error: 'Trop de tentatives de connexion Riot. Veuillez patienter 5 minutes.' };
         } else {
-            return { success: false, error: lastResult?.error || 'Erreur d\'authentification Riot Games inconnue.' };
+            return { success: false, error: authRes.data?.error || 'Erreur d\'authentification Riot Games inconnue.' };
         }
 
     } catch (err) {
@@ -211,10 +168,8 @@ async function submit2FACode(code, cookieMap) {
             headers: {
                 'Content-Type': 'application/json',
                 'Cookie': cookieMapToString(cookieMap),
-                'User-Agent': USER_AGENT,
-                'Accept': 'application/json, text/plain, */*'
+                'User-Agent': USER_AGENT
             },
-            httpsAgent: tlsAgent,
             validateStatus: () => true
         });
 
@@ -239,15 +194,13 @@ async function submit2FACode(code, cookieMap) {
 }
 
 // 3. Build Full Session Payload (Entitlements, PUUID, Riot ID, Shard)
-async function buildSessionPayload(accessToken, idToken, cookieMap = {}) {
+async function buildSessionPayload(accessToken, idToken, cookieMap) {
     const [entRes, userRes] = await Promise.all([
         axios.post('https://entitlements.auth.riotgames.com/api/token/v1', {}, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            httpsAgent: tlsAgent
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
         }),
         axios.get('https://auth.riotgames.com/userinfo', {
-            headers: { 'Authorization': `Bearer ${accessToken}` },
-            httpsAgent: tlsAgent
+            headers: { 'Authorization': `Bearer ${accessToken}` }
         })
     ]);
 
@@ -285,10 +238,8 @@ async function refreshRiotSession(sessionData) {
             headers: {
                 'Content-Type': 'application/json',
                 'Cookie': cookieMapToString(sessionData.cookieMap),
-                'User-Agent': USER_AGENT,
-                'Accept': 'application/json, text/plain, */*'
+                'User-Agent': USER_AGENT
             },
-            httpsAgent: tlsAgent,
             validateStatus: () => true
         });
 
@@ -354,7 +305,6 @@ module.exports = {
     decryptData,
     loginRiotRSO,
     submit2FACode,
-    buildSessionPayload,
     refreshRiotSession,
     fetchStorefront,
     extractTokensFromUri

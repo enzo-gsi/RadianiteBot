@@ -98,6 +98,14 @@ async function refreshValorantData() {
 // Slash Commands Definition (All descriptions <= 100 chars as per Discord API)
 const commands = [
     {
+        name: 'settings',
+        description: 'Configure bot settings, alert channels, mentions, rank-up notifications and language.',
+    },
+    {
+        name: 'config',
+        description: 'Configure bot settings, alert channels, mentions and language (alias /settings).',
+    },
+    {
         name: 'history',
         description: 'Match history (5/page), net RR wheel, current rank and lobby scoreboards.',
         options: [
@@ -689,6 +697,101 @@ async function handleStoreInteraction(interaction, tokenArg) {
             components: [createLoginActionRow()]
         });
     }
+}
+
+// Helper: Generate Rich Interactive Settings Payload
+async function renderSettingsPayload(discordId, guildId, isEn) {
+    let user = await knex('users').where({ discord_id: String(discordId) }).first();
+    let guildConfig = guildId ? await knex('guild_configs').where({ guild_id: String(guildId) }).first() : null;
+
+    const lang = user?.language || guildConfig?.language || (isEn ? 'en' : 'fr');
+    const isEnglish = (lang === 'en');
+
+    const channelId = user?.discord_channel_id || guildConfig?.channel_id || null;
+    const notifyMentions = (user?.notify_mentions !== false);
+    const notifyRankupOnly = Boolean(user?.notify_rankup_only);
+    const showRankWheel = (user?.show_rank_wheel !== false);
+
+    // Tracked players
+    const followed = user ? await knex('followed_players').where({ user_id: user.id }) : [];
+    const trackedListStr = followed.length > 0
+        ? followed.map(p => `• \`${p.riot_id}\``).join('\n')
+        : (isEnglish ? '*No players followed yet. Use `/follow player: Player#TAG`*' : '*Aucun joueur suivi. Utilisez `/follow player: Pseudo#TAG`*');
+
+    const embed = new EmbedBuilder()
+        .setTitle(isEnglish ? '⚙️ RADIANITEBOT // SERVER & USER SETTINGS' : '⚙️ RADIANITEBOT // PARAMÈTRES & CONFIGURATION')
+        .setColor(0x00f5d4)
+        .setDescription(
+            (isEnglish 
+                ? `Configure your Valorant match alerts and companion preferences in 1 click below.\n────────────────────────────────────────`
+                : `Configurez vos alertes de fin de match et vos préférences en 1 clic ci-dessous.\n────────────────────────────────────────`)
+        )
+        .addFields(
+            {
+                name: isEnglish ? '📢 Match Alerts Channel' : '📢 Salon des Alertes de Match',
+                value: channelId ? `<#${channelId}> (\`${channelId}\`)` : (isEnglish ? '❌ *Not configured (Click button below to set)*' : '❌ *Non configuré (Cliquez sur le bouton ci-dessous)*'),
+                inline: true
+            },
+            {
+                name: isEnglish ? '🌐 Language' : '🌐 Langue',
+                value: isEnglish ? '🇺🇸 **English**' : '🇫🇷 **Français**',
+                inline: true
+            },
+            {
+                name: isEnglish ? '🔔 @Mention Notification' : '🔔 Mention @vous',
+                value: notifyMentions ? '✅ **Enabled**' : '❌ **Disabled**',
+                inline: true
+            },
+            {
+                name: isEnglish ? '🏆 Rank-up Alerts Only' : '🏆 Alertes Rank-up Seulement',
+                value: notifyRankupOnly ? '✅ **Enabled (Promotions only)**' : '❌ **Disabled (All matches)**',
+                inline: true
+            },
+            {
+                name: isEnglish ? '🎡 3D Rank Wheel' : '🎡 Roue de Rang 3D',
+                value: showRankWheel ? '✅ **Enabled**' : '❌ **Disabled**',
+                inline: true
+            },
+            {
+                name: isEnglish ? `👥 Tracked Squad (${followed.length})` : `👥 Joueurs Suivis (${followed.length})`,
+                value: trackedListStr,
+                inline: false
+            }
+        )
+        .setFooter({ text: 'RadianiteDB • Click buttons below to update settings in real-time' })
+        .setTimestamp();
+
+    const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('btn_settings_set_current_channel')
+            .setLabel(isEnglish ? '📢 Set Current Channel' : '📢 Définir ce salon')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId('btn_settings_toggle_mentions')
+            .setLabel(notifyMentions ? (isEnglish ? '🔔 Mentions: ON' : '🔔 Mentions : OUI') : (isEnglish ? '🔕 Mentions: OFF' : '🔕 Mentions : NON'))
+            .setStyle(notifyMentions ? ButtonStyle.Success : ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId('btn_settings_toggle_rankup')
+            .setLabel(notifyRankupOnly ? (isEnglish ? '🏆 Rankups Only: ON' : '🏆 Rankups Seul : OUI') : (isEnglish ? '🏆 All Matches: ON' : '🏆 Tous Matchs : OUI'))
+            .setStyle(notifyRankupOnly ? ButtonStyle.Success : ButtonStyle.Secondary)
+    );
+
+    const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('btn_settings_toggle_wheel')
+            .setLabel(showRankWheel ? (isEnglish ? '🎡 Rank Wheel: ON' : '🎡 Roue RR : OUI') : (isEnglish ? '🎡 Rank Wheel: OFF' : '🎡 Roue RR : NON'))
+            .setStyle(showRankWheel ? ButtonStyle.Success : ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId('btn_settings_switch_lang')
+            .setLabel(isEnglish ? '🇫🇷 Passer en Français' : '🇺🇸 Switch to English')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId('btn_settings_refresh')
+            .setLabel(isEnglish ? '🔄 Refresh' : '🔄 Actualiser')
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    return { embeds: [embed], components: [row1, row2] };
 }
 
 // Helper: Determine User Language from Database ('fr' or 'en')
@@ -1427,6 +1530,49 @@ client.on('interactionCreate', async interaction => {
             };
             return interaction.reply({ content: msgs[chosenLang] || msgs.en, ephemeral: true });
         }
+
+        // ⚙️ Interactive Settings Buttons Handlers
+        if (interaction.customId.startsWith('btn_settings_')) {
+            await interaction.deferUpdate().catch(() => {});
+            const isEn = (await getUserLang(interaction.user.id)) === 'en';
+            let user = await knex('users').where({ discord_id: interaction.user.id }).first();
+            if (!user) {
+                await knex('users').insert({
+                    discord_id: interaction.user.id,
+                    username: interaction.user.username,
+                    avatar: interaction.user.displayAvatarURL(),
+                    language: isEn ? 'en' : 'fr'
+                });
+                user = await knex('users').where({ discord_id: interaction.user.id }).first();
+            }
+
+            if (interaction.customId === 'btn_settings_set_current_channel') {
+                await knex('users').where({ discord_id: interaction.user.id }).update({ discord_channel_id: interaction.channelId });
+                if (interaction.guildId) {
+                    await knex('guild_configs').where({ guild_id: interaction.guildId }).update({ channel_id: interaction.channelId }).catch(() => {});
+                }
+            } else if (interaction.customId === 'btn_settings_toggle_mentions') {
+                const currentVal = user.notify_mentions !== false;
+                await knex('users').where({ discord_id: interaction.user.id }).update({ notify_mentions: !currentVal });
+            } else if (interaction.customId === 'btn_settings_toggle_rankup') {
+                const currentVal = Boolean(user.notify_rankup_only);
+                await knex('users').where({ discord_id: interaction.user.id }).update({ notify_rankup_only: !currentVal });
+            } else if (interaction.customId === 'btn_settings_toggle_wheel') {
+                const currentVal = user.show_rank_wheel !== false;
+                await knex('users').where({ discord_id: interaction.user.id }).update({ show_rank_wheel: !currentVal });
+            } else if (interaction.customId === 'btn_settings_switch_lang') {
+                const currentLang = user.language === 'en' ? 'en' : 'fr';
+                const nextLang = currentLang === 'en' ? 'fr' : 'en';
+                await knex('users').where({ discord_id: interaction.user.id }).update({ language: nextLang });
+                if (interaction.guildId) {
+                    await knex('guild_configs').where({ guild_id: interaction.guildId }).update({ language: nextLang }).catch(() => {});
+                }
+            }
+
+            const updatedPayload = await renderSettingsPayload(interaction.user.id, interaction.guildId, isEn);
+            await interaction.editReply(updatedPayload).catch(() => {});
+            return;
+        }
     }
 
     // 📋 Handle Modal Submission: Save Persistent Riot Session
@@ -1484,6 +1630,14 @@ client.on('interactionCreate', async interaction => {
     const { commandName } = interaction;
     incrementBotStat(`cmd_${commandName}`);
     incrementBotStat('total_commands');
+
+    // 0. /settings Command
+    if (commandName === 'settings' || commandName === 'config') {
+        await interaction.deferReply({ ephemeral: true });
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
+        const payload = await renderSettingsPayload(interaction.user.id, interaction.guildId, isEn);
+        return interaction.editReply(payload);
+    }
 
     // 1. /login Command (Direct RSO Authentication or Official Link or Interactive Buttons)
     if (commandName === 'login') {
@@ -2159,6 +2313,7 @@ client.on('interactionCreate', async interaction => {
             .setDescription(
                 isEn
                     ? `**Official Valorant telemetry, store radar and match analysis.**\n\n` +
+                      `⚙️ **/settings** • Interactive control panel: alert channel, @mentions, rank-up filters & language.\n` +
                       `📊 **/history [player] [mode]** • 50+ Match history, 5-game net RR Wheel, and interactive scoreboards.\n` +
                       `🛒 **/store** • Live 24h rotating skin shop, wallet balances and Night Market discounts.\n` +
                       `📈 **/session [player]** • Past 24h match performance recap, net RR win/loss and K/D.\n` +
@@ -2170,6 +2325,7 @@ client.on('interactionCreate', async interaction => {
                       `⭐ **/wishlist** • Track skins for instant private DM alerts.\n` +
                       `🌐 **/language** • Change bot language.`
                     : `**Télémétrie Valorant officielle, radar de boutique et analyse de parties.**\n\n` +
+                      `⚙️ **/settings** • Panneau de configuration interactif : salon, mentions @vous, filtres rankup & langue.\n` +
                       `📊 **/history [joueur] [mode]** • Historique 50+ matchs, roue RR 5 parties et scoreboards complets.\n` +
                       `🛒 **/store** • Boutique du jour 24h en direct, soldes et Marché Nocturne.\n` +
                       `📈 **/session [joueur]** • Rapport de performance des dernières 24h avec gain/perte net de RR.\n` +
@@ -2587,11 +2743,18 @@ async function checkFollowedPlayers() {
                     const totalShots = (p.stats?.headshots || 0) + (p.stats?.bodyshots || 0) + (p.stats?.legshots || 0);
                     const hsPercent = totalShots > 0 ? Math.round((p.stats.headshots / totalShots) * 100) : 0;
 
+                    const badges = [];
+                    if (kills >= 30) badges.push('🔥 30+ BOMB');
+                    if (hsPercent >= 40 && kills >= 15) badges.push('🎯 HEADSHOT DEMON');
+                    if (kd >= 2.5 && kills >= 15) badges.push('👑 UNTOUCHABLE');
+                    if (String(pData.rrChange || '').includes('Ranked Up') || String(pData.rrChange || '').includes('Promoted')) badges.push('🏆 TIER RANKUP');
+                    const badgeText = badges.length > 0 ? `\n🏅 **Highlights :** ${badges.join(' • ')}` : '';
+
                     if (pData.isDeathmatch) {
                         mainEmbed.addFields({
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character}) • ${pData.isDmWin ? (isEn ? '🏆 Top 1 (Victory)' : '🏆 Top 1 (Victoire)') : `Top ${pData.placement}/${match.players?.all_players?.length || 12}`}`,
                             value: `🎯 **Score :** **${kills} Kills / ${deaths} ${isEn ? 'Deaths' : 'Morts'}** (${kd} KD)\n` +
-                                   `💥 **Assists :** ${assists} | 🎯 **${isEn ? 'Headshots' : 'Tirs Tête'} :** ${p.stats?.headshots || 0} (${hsPercent}%)\n` +
+                                   `💥 **Assists :** ${assists} | 🎯 **${isEn ? 'Headshots' : 'Tirs Tête'} :** ${p.stats?.headshots || 0} (${hsPercent}%)${badgeText}\n` +
                                    `────────────────────────────────────────`,
                             inline: false
                         });
@@ -2600,7 +2763,7 @@ async function checkFollowedPlayers() {
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character})`,
                             value: `⚔️ **K/D/A :** ${kills}/${deaths}/${assists} (${kd} KD)\n` +
                                    `💥 **ACS :** ${acs} | 🎯 **${isEn ? 'Headshot %' : 'Tirs Tête'} :** ${hsPercent}%\n` +
-                                   `📈 **${isEn ? 'RR Change' : 'Évolution RR'} :** **${pData.rrChange || '±0 RR'}**\n` +
+                                   `📈 **${isEn ? 'RR Change' : 'Évolution RR'} :** **${pData.rrChange || '±0 RR'}**${badgeText}\n` +
                                    `────────────────────────────────────────`,
                             inline: false
                         });
@@ -2608,7 +2771,7 @@ async function checkFollowedPlayers() {
                         mainEmbed.addFields({
                             name: `👤 ${idx + 1}. ${pData.riotId} (${p.character})`,
                             value: `⚔️ **K/D/A :** ${kills}/${deaths}/${assists} (${kd} KD)\n` +
-                                   `💥 **ACS :** ${acs} | 🎯 **${isEn ? 'Headshot %' : 'Tirs Tête'} :** ${hsPercent}%\n` +
+                                   `💥 **ACS :** ${acs} | 🎯 **${isEn ? 'Headshot %' : 'Tirs Tête'} :** ${hsPercent}%${badgeText}\n` +
                                    `────────────────────────────────────────`,
                             inline: false
                         });

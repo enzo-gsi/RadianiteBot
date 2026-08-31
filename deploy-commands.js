@@ -6,183 +6,64 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '1436123733197590624';
 
 const commands = [
     {
-        name: 'history',
-        description: 'Match history (5/page), net RR wheel, current rank and lobby scoreboards.',
+        name: 'settings',
+        description: 'Configurer les alertes de match, salon d\'annonces, mentions, roue RR et préférences.',
+    },
+    {
+        name: 'boutique',
+        description: 'Boutique Valorant du jour, soldes VP/RP/KC et Marché Nocturne.',
         options: [
             {
-                name: 'player',
-                description: 'Optional: Player name#TAG (e.g. TenZ#SEN or Boaster#FNC)',
+                name: 'lien_ou_token',
+                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
                 type: ApplicationCommandOptionType.String,
                 required: false
-            },
-            {
-                name: 'mode',
-                description: 'Filter game mode (Competitive by default)',
-                type: ApplicationCommandOptionType.String,
-                required: false,
-                choices: [
-                    { name: '🏆 Competitive / Ranked', value: 'competitive' },
-                    { name: '🌐 All Modes', value: 'all' },
-                    { name: '🎯 Deathmatch', value: 'deathmatch' },
-                    { name: '⚡ Swiftplay', value: 'swiftplay' },
-                    { name: '🥊 Team Deathmatch', value: 'teamdeathmatch' },
-                    { name: '🎮 Unrated', value: 'unrated' }
-                ]
             }
         ]
     },
     {
         name: 'store',
-        description: 'Check your live 24h Valorant daily store, wallet balances and Night Market.',
+        description: 'Boutique Valorant du jour en direct (alias /boutique).',
         options: [
             {
-                name: 'link_or_token',
-                description: 'Optional: Paste your official Riot link or access token',
+                name: 'lien_ou_token',
+                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
         ]
     },
     {
-        name: 'session',
-        description: 'Daily match performance recap, net RR win/loss, and KD telemetry.',
+        name: 'shop',
+        description: 'Boutique Valorant du jour en direct (alias /boutique).',
         options: [
             {
-                name: 'player',
-                description: 'Optional: Player name#TAG to inspect',
+                name: 'lien_ou_token',
+                description: 'Optionnel: Collez votre lien officiel Riot ou jeton',
                 type: ApplicationCommandOptionType.String,
                 required: false
-            }
-        ]
-    },
-    {
-        name: 'wishlist',
-        description: 'Manage skin wishlist and receive automated DM alerts upon rotation drops.',
-        options: [
-            {
-                name: 'add',
-                description: 'Add a weapon skin to your wishlist',
-                type: ApplicationCommandOptionType.Subcommand,
-                options: [
-                    {
-                        name: 'skin',
-                        description: 'Weapon skin name (autocomplete supported)',
-                        type: ApplicationCommandOptionType.String,
-                        required: true,
-                        autocomplete: true
-                    }
-                ]
-            },
-            {
-                name: 'remove',
-                description: 'Remove a weapon skin from your wishlist',
-                type: ApplicationCommandOptionType.Subcommand,
-                options: [
-                    {
-                        name: 'skin',
-                        description: 'Weapon skin name to remove',
-                        type: ApplicationCommandOptionType.String,
-                        required: true,
-                        autocomplete: true
-                    }
-                ]
-            },
-            {
-                name: 'list',
-                description: 'Display all your currently tracked wishlist skins',
-                type: ApplicationCommandOptionType.Subcommand
-            }
-        ]
-    },
-    {
-        name: 'scout',
-        description: 'Scout player profile: rank, winrate, headshot accuracy & weapon mastery.',
-        options: [
-            {
-                name: 'player',
-                description: 'Optional: Player name#TAG to analyze',
-                type: ApplicationCommandOptionType.String,
-                required: false
-            }
-        ]
-    },
-    {
-        name: 'leaderboard',
-        description: 'Server competitive leaderboard of followed players (RR, Rank, KD).',
-    },
-    {
-        name: 'follow',
-        description: 'Follow a player to receive automated match results & rank-up alerts in this server.',
-        options: [
-            {
-                name: 'player',
-                description: 'Player name#TAG to follow (e.g. TenZ#SEN)',
-                type: ApplicationCommandOptionType.String,
-                required: true
-            }
-        ]
-    },
-    {
-        name: 'unfollow',
-        description: 'Stop tracking a player in this server.',
-        options: [
-            {
-                name: 'player',
-                description: 'Player name#TAG to unfollow',
-                type: ApplicationCommandOptionType.String,
-                required: true
-            }
-        ]
-    },
-    {
-        name: 'setchannel',
-        description: 'Set target Discord channel for post-match summary and rank-up alerts.',
-        options: [
-            {
-                name: 'channel',
-                description: 'Optional: Channel to send alerts to (defaults to current channel)',
-                type: ApplicationCommandOptionType.Channel,
-                required: false
-            }
-        ]
-    },
-    {
-        name: 'language',
-        description: 'Change bot language for this server or user.',
-        options: [
-            {
-                name: 'lang',
-                description: 'Select language',
-                type: ApplicationCommandOptionType.String,
-                required: true,
-                choices: [
-                    { name: '🇺🇸 English', value: 'en' },
-                    { name: '🇫🇷 Français', value: 'fr' },
-                    { name: '🇪🇸 Español', value: 'es' },
-                    { name: '🇩🇪 Deutsch', value: 'de' }
-                ]
             }
         ]
     },
     {
         name: 'login',
-        description: 'Link your Riot account for live store & match tracking (AES-256 encrypted).',
+        description: 'Lier votre compte Riot (session persistante chiffrée AES-256).',
         options: [
             {
-                name: 'username',
-                description: 'Riot Games account username',
+                name: 'identifiant',
+                description: 'Option 1: Nom d\'utilisateur Riot Games (login launcher)',
                 type: ApplicationCommandOptionType.String,
                 required: false
             },
             {
-                name: 'password',
-                description: 'Riot Games account password',
+                name: 'mot_de_passe',
+                description: 'Option 1: Mot de passe Riot Games',
                 type: ApplicationCommandOptionType.String,
                 required: false
             },
             {
-                name: 'link',
-                description: 'Official Riot auth link (playvalorant.com/opt_in...)',
+                name: 'lien',
+                description: 'Option 2: Lien officiel Riot (playvalorant.com/opt_in...)',
                 type: ApplicationCommandOptionType.String,
                 required: false
             }
@@ -190,11 +71,11 @@ const commands = [
     },
     {
         name: '2fa',
-        description: 'Submit 6-digit email 2FA verification code.',
+        description: 'Valider le code de sécurité 2FA reçu par email.',
         options: [
             {
                 name: 'code',
-                description: 'The 6-digit 2FA code received by email',
+                description: 'Le code de sécurité à 6 chiffres reçu par email',
                 type: ApplicationCommandOptionType.String,
                 required: true
             }
@@ -202,11 +83,146 @@ const commands = [
     },
     {
         name: 'unlink',
-        description: 'Permanently remove your saved Riot credentials from the bot.',
+        description: 'Supprimer définitivement votre session Riot du bot.',
     },
     {
-        name: 'help',
-        description: 'Show all available RadianiteBot commands and features.',
+        name: 'setchannel',
+        description: 'Définir ce salon textuel pour les alertes de fin de match.',
+    },
+    {
+        name: 'wishlist',
+        description: 'Gérer vos skins souhaités (alertes MP automatiques lors des rotations de boutique).',
+        options: [
+            {
+                name: 'ajouter',
+                description: 'Ajouter un skin à surveiller dans votre boutique quotidienne.',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Nom du skin d\'arme Valorant à surveiller',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'retirer',
+                description: 'Retirer un skin de votre liste de surveillance.',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: 'skin',
+                        description: 'Nom du skin à retirer de votre liste',
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        autocomplete: true
+                    }
+                ]
+            },
+            {
+                name: 'liste',
+                description: 'Afficher tous vos skins actuellement surveillés.',
+                type: ApplicationCommandOptionType.Subcommand
+            }
+        ]
+    },
+    {
+        name: 'scout',
+        description: 'Analyser en direct le lobby et les rangs/stats des adversaires.',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
+    },
+    {
+        name: 'leaderboard',
+        description: 'Server competitive leaderboard (Top RR, Tiers, K/D).',
+    },
+    {
+        name: 'session',
+        description: 'Rapport de performance des parties jouées sur les dernières 24h.',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            }
+        ]
+    },
+    {
+        name: 'language',
+        description: 'Choisir la langue des messages du bot (Français / English).',
+        options: [
+            {
+                name: 'langue',
+                description: 'Sélectionnez Français ou English',
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: [
+                    { name: '🇫🇷 Français', value: 'fr' },
+                    { name: '🇺🇸 English', value: 'en' }
+                ]
+            }
+        ]
+    },
+    {
+        name: 'history',
+        description: 'Historique des matchs (5 par page), évolution RR, roue de rang et scoreboards détaillés.',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            },
+            {
+                name: 'mode',
+                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
+                type: ApplicationCommandOptionType.String,
+                required: false,
+                choices: [
+                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
+                    { name: '🌐 Tous les modes (All)', value: 'all' },
+                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
+                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
+                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
+                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
+                ]
+            }
+        ]
+    },
+    {
+        name: 'historique',
+        description: 'Historique des matchs (5 par page), évolution RR et scoreboards (alias /history).',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Optionnel: Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
+                type: ApplicationCommandOptionType.String,
+                required: false
+            },
+            {
+                name: 'mode',
+                description: 'Filtrer par mode de jeu (Compétitif par défaut)',
+                type: ApplicationCommandOptionType.String,
+                required: false,
+                choices: [
+                    { name: '🏆 Compétitif / Ranked', value: 'competitive' },
+                    { name: '🌐 Tous les modes (All)', value: 'all' },
+                    { name: '🎯 Match à Mort (Deathmatch)', value: 'deathmatch' },
+                    { name: '⚡ Véloce (Swiftplay)', value: 'swiftplay' },
+                    { name: '🥊 TDM (Team Deathmatch)', value: 'teamdeathmatch' },
+                    { name: '🎮 Non-classé (Unrated)', value: 'unrated' }
+                ]
+            }
+        ]
     }
 ];
 
