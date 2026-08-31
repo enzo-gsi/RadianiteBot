@@ -1239,9 +1239,10 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
                    `> 🎯 **${kills} Kills / ${deaths} Morts** (**${kd} KD**) • **${hs}% HS**\n`;
         });
 
+        const dmTitle = `## 🎯 ${isEn ? `FINAL STANDINGS (${allPlayers.length} PLAYERS)` : `CLASSEMENT FINAL (${allPlayers.length} JOUEURS)`}\n`;
         scoreboardEmbed.addFields({
-            name: isEn ? `🎯 FINAL STANDINGS (${allPlayers.length} Players)` : `🎯 CLASSEMENT FINAL (${allPlayers.length} Joueurs)`,
-            value: dmLeaderboardLines.join('\n') || (isEn ? 'No player stats available' : 'Aucune stat disponible'),
+            name: '\u200b',
+            value: dmTitle + (dmLeaderboardLines.join('\n') || (isEn ? 'No player stats available' : 'Aucune stat disponible')),
             inline: false
         });
 
@@ -1273,15 +1274,18 @@ async function buildMatchDetailsPayload(historyData, matchIndex = 0, returnPage 
         const blueLines = blueTeamPlayers.map(formatPlayerLine).join('\n') || (isEn ? 'No players' : 'Aucun joueur');
         const redLines = redTeamPlayers.map(formatPlayerLine).join('\n') || (isEn ? 'No players' : 'Aucun joueur');
 
+        const blueTitle = `## 🔵 ${isEn ? 'BLUE TEAM' : 'ÉQUIPE BLEUE'} — ${blueTeamObj.rounds_won} Rounds ${blueTeamObj.has_won ? '🏆' : ''}\n`;
+        const redTitle = `## 🔴 ${isEn ? 'RED TEAM' : 'ÉQUIPE ROUGE'} — ${redTeamObj.rounds_won} Rounds ${redTeamObj.has_won ? '🏆' : ''}\n`;
+
         scoreboardEmbed.addFields(
             {
-                name: `🔵 ${isEn ? 'BLUE TEAM' : 'ÉQUIPE BLEUE'} (${blueTeamObj.rounds_won} Rounds ${blueTeamObj.has_won ? '🏆' : ''})`,
-                value: blueLines,
+                name: '\u200b',
+                value: blueTitle + blueLines,
                 inline: false
             },
             {
-                name: `🔴 ${isEn ? 'RED TEAM' : 'ÉQUIPE ROUGE'} (${redTeamObj.rounds_won} Rounds ${redTeamObj.has_won ? '🏆' : ''})`,
-                value: redLines,
+                name: '\u200b',
+                value: redTitle + redLines,
                 inline: false
             }
         );
