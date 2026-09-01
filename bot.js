@@ -195,18 +195,6 @@ const commands = [
         ]
     },
     {
-        name: 'scout',
-        description: 'Scout player profile: rank, winrate, headshot accuracy & weapon mastery.',
-        options: [
-            {
-                name: 'player',
-                description: 'Optional: Player name#TAG to analyze',
-                type: ApplicationCommandOptionType.String,
-                required: false
-            }
-        ]
-    },
-    {
         name: 'leaderboard',
         description: 'Server competitive leaderboard of followed players (RR, Rank, KD).',
     },
@@ -443,9 +431,8 @@ client.on('guildCreate', async guild => {
                 .setDescription(`**Thank you for inviting RadianiteBot to ${guild.name}!** 🎯\n\nRadianiteBot is your high-precision Valorant companion for real-time match tracking, 24h store inspection, automated rank alerts, and squad leaderboards.`)
                 .addFields(
                     { name: '📊 `/history [player]`', value: '50+ match archives with 5-game net RR Wheel and 10-player interactive lobby scoreboards.', inline: false },
-                    { name: '🛒 `/store` & `/wishlist`', value: 'Check your 24h rotating skin store, Night Market discounts, and set alerts for your favorite skins.', inline: false },
+                    { name: '🛒 `/store` & `/wishlist`', value: 'Check your 24h rotating skin store, and set alerts for your favorite skins.', inline: false },
                     { name: '📈 `/session [player]`', value: '24h session performance recap with net RR, Win/Loss and stats.', inline: false },
-                    { name: '🔍 `/scout [player]`', value: 'Live MMR, rank telemetry, headshot accuracy & favorite weapons.', inline: false },
                     { name: '🏆 `/leaderboard`', value: 'Server squad leaderboard ranking followed players by RR & tier.', inline: false },
                     { name: '👥 `/follow [player]` & `/unfollow`', value: 'Follow players to automatically receive post-match summary cards in your server channel.', inline: false },
                     { name: '🔔 `/setchannel`', value: 'Set the dedicated channel for automatic match notifications.', inline: false }
@@ -1966,173 +1953,7 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // 7. /scout Command
-    if (commandName === 'scout') {
-        await interaction.deferReply({ ephemeral: false });
-
-        const isEn = (await getUserLang(interaction.user.id)) === 'en';
-        const dbUser = await knex('users').where({ discord_id: interaction.user.id }).first();
-        let userSession = null;
-
-        if (dbUser?.riot_auth) {
-            userSession = decryptData(dbUser.riot_auth);
-        }
-
-        if (!userSession?.accessToken || !userSession?.puuid) {
-            const notLoggedEmbed = new EmbedBuilder()
-                .setTitle(isEn ? '🔐 LOGIN REQUIRED FOR LIVE SCOUTING' : '🔐 CONNEXION REQUISE POUR LE LIVE SCOUTING')
-                .setColor(0xff4655)
-                .setDescription(
-                    isEn
-                        ? `To scout the **10 players in your live match** (current ranks, RR, enemy peak ranks), you must link your Riot Games account!\n\n` +
-                          `👉 **How to do it in 2 quick steps:**\n` +
-                          `1️⃣ Click **"1. Sign in with Riot Games"** below.\n` +
-                          `2️⃣ Copy the redirect URL and click **"2. Paste connection link"**.\n` +
-                          `3️⃣ Start a match on Valorant and re-run **/scout**!`
-                        : `Pour espionner en direct les **10 joueurs de votre match** (rangs actuels, RR, Peak Ranks adverses), vous devez d'abord lier votre compte Riot Games !\n\n` +
-                          `👉 **Comment faire en 2 étapes rapides :**\n` +
-                          `1️⃣ Cliquez sur **"1. Se connecter sur Riot Games"** ci-dessous.\n` +
-                          `2️⃣ Copiez l'URL de redirection et cliquez sur **"2. Coller mon lien de connexion"**.\n` +
-                          `3️⃣ Lancez une partie sur Valorant et réexécutez **/scout** !`
-                )
-                .setFooter({ text: 'RadianiteBot • Riot Games Live Radar' });
-
-            return interaction.editReply({
-                embeds: [notLoggedEmbed],
-                components: [createLoginActionRow()]
-            });
-        }
-
-        try {
-            const shard = userSession.shard || 'eu';
-            const region = shard === 'eu' ? 'eu-1' : shard === 'na' ? 'na-1' : shard === 'kr' ? 'kr-1' : 'ap-1';
-            const riotHeaders = {
-                'Authorization': `Bearer ${userSession.accessToken}`,
-                'X-Riot-Entitlements-JWT': userSession.entitlementsToken,
-                'X-Riot-ClientPlatform': 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9',
-                'X-Riot-ClientVersion': cachedRiotVersion,
-                'User-Agent': 'ShooterGame/14 Windows/10.0.19042.1.256.64bit'
-            };
-
-            let liveMatchData = null;
-            let isPregame = false;
-
-            try {
-                const corePlayerRes = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/core-game/v1/players/${userSession.puuid}`, { headers: riotHeaders });
-                if (corePlayerRes.data?.MatchID) {
-                    const matchDetails = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/core-game/v1/matches/${corePlayerRes.data.MatchID}`, { headers: riotHeaders });
-                    liveMatchData = matchDetails.data;
-                }
-            } catch (cErr) {}
-
-            if (!liveMatchData) {
-                try {
-                    const prePlayerRes = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/pregame/v1/players/${userSession.puuid}`, { headers: riotHeaders });
-                    if (prePlayerRes.data?.MatchID) {
-                        const matchDetails = await axios.get(`https://glz-${region}.${shard}.a.pvp.net/pregame/v1/matches/${prePlayerRes.data.MatchID}`, { headers: riotHeaders });
-                        liveMatchData = matchDetails.data;
-                        isPregame = true;
-                    }
-                } catch (pErr) {}
-            }
-
-            if (liveMatchData && liveMatchData.Players?.length > 0) {
-                const myPlayer = liveMatchData.Players.find(p => p.Subject === userSession.puuid);
-                const myTeamId = myPlayer?.TeamID || 'Blue';
-                
-                const allyTeam = [];
-                const enemyTeam = [];
-
-                for (const p of liveMatchData.Players) {
-                    let pName = isEn ? 'Player' : 'Joueur';
-                    let pTag = '';
-                    let pTier = isEn ? 'Unrated' : 'Non-classé';
-                    let pPeak = isEn ? 'Unknown' : 'Inconnu';
-                    let pRR = 0;
-
-                    try {
-                        const mmrRes = await henrikApi.get(`/valorant/v2/by-puuid/mmr/${shard}/${p.Subject}`).catch(() => null);
-                        if (mmrRes?.data?.data) {
-                            const d = mmrRes.data.data;
-                            pName = d.name || (isEn ? 'Player' : 'Joueur');
-                            pTag = d.tag || '';
-                            pTier = d.current_data?.currenttierpatched || (isEn ? 'Unrated' : 'Non-classé');
-                            pRR = d.current_data?.ranking_in_tier || 0;
-                            pPeak = d.highest_rank?.patched_tier || (isEn ? 'Unknown' : 'Inconnu');
-                        }
-                    } catch (hErr) {}
-
-                    const playerInfo = {
-                        puuid: p.Subject,
-                        riotId: pTag ? `${pName}#${pTag}` : pName,
-                        tier: pTier,
-                        peak: pPeak,
-                        rr: pRR,
-                        isSelf: p.Subject === userSession.puuid
-                    };
-
-                    if (p.TeamID === myTeamId) {
-                        allyTeam.push(playerInfo);
-                    } else {
-                        enemyTeam.push(playerInfo);
-                    }
-                    await sleep(250);
-                }
-
-                const liveEmbed = new EmbedBuilder()
-                    .setTitle(
-                        isEn 
-                            ? `🔴 LIVE MATCH RADAR • ACTIVE LOBBY (${isPregame ? 'Agent Selection' : 'In Game'})`
-                            : `🔴 RADAR LIVE MATCH • LOBBY ACTIF (${isPregame ? 'Sélection des Agents' : 'En Match'})`
-                    )
-                    .setColor(0x00f5d4)
-                    .setDescription(
-                        `🎮 **Mode :** ${liveMatchData.ModeID ? path.basename(liveMatchData.ModeID) : (isEn ? 'Competitive' : 'Compétitif')}\n` +
-                        `🗺️ **Map ID :** ${liveMatchData.MapID ? path.basename(liveMatchData.MapID) : (isEn ? 'Current' : 'Actuelle')}\n` +
-                        `────────────────────────────────────────\n` +
-                        (isEn ? `🔵 **ALLY TEAM (${allyTeam.length} players) :**\n` : `🔵 **ÉQUIPE ALLIÉE (${allyTeam.length} joueurs) :**\n`) +
-                        allyTeam.map((p, idx) => `**${idx + 1}.** ${p.isSelf ? `👉 **${p.riotId}** (${isEn ? 'You' : 'Vous'})` : `**${p.riotId}**`} — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
-                        (isEn ? `\n\n────────────────────────────────────────\n🔴 **ENEMY TEAM (${enemyTeam.length} players) :**\n` : `\n\n────────────────────────────────────────\n🔴 **ÉQUIPE ADVERSE (${enemyTeam.length} joueurs) :**\n`) +
-                        enemyTeam.map((p, idx) => `**${idx + 1}.** **${p.riotId}** — **${p.tier}** (${p.rr} RR) • *Peak: ${p.peak}*`).join('\n') +
-                        `\n────────────────────────────────────────`
-                    )
-                    .setFooter({ text: 'RadianiteDB Live Lobby Radar • Riot Games PvP Data' })
-                    .setTimestamp();
-
-                return interaction.editReply({ embeds: [liveEmbed] });
-            }
-
-            const notInGameEmbed = new EmbedBuilder()
-                .setTitle(isEn ? '⚠️ NO LIVE MATCH DETECTED' : '⚠️ AUCUNE PARTIE EN DIRECT DÉTECTÉE')
-                .setColor(0xffb703)
-                .setDescription(
-                    isEn
-                        ? `👤 **Verified Account :** **${userSession.username || 'Connected'}**\n\n` +
-                          `The bot did not detect any active match on your account.\n\n` +
-                          `👉 **To launch the live radar :**\n` +
-                          `1️⃣ Start matchmaking on Valorant.\n` +
-                          `2️⃣ Once you enter **agent select** or **in game**, type **/scout** on Discord.\n` +
-                          `3️⃣ The bot will instantly display all 10 players, their ranks and Peak Ranks!`
-                        : `👤 **Compte vérifié :** **${userSession.username || 'Connecté'}**\n\n` +
-                          `Le bot n'a détecté aucune partie en cours sur votre compte.\n\n` +
-                          `👉 **Pour lancer le radar de partie :**\n` +
-                          `1️⃣ Lancez une recherche de match sur Valorant.\n` +
-                          `2️⃣ Dès que vous entrez en **sélection d'agents** ou en **partie**, tapez **/scout** sur Discord.\n` +
-                          `3️⃣ Le bot affichera instantanément les 10 joueurs du lobby, leurs rangs et leurs Peak Ranks !`
-                )
-                .setFooter({ text: 'RadianiteBot • Live Radar' });
-
-            return interaction.editReply({ embeds: [notInGameEmbed] });
-
-        } catch (err) {
-            console.error('[RadianiteBot] Erreur /scout live:', err.message);
-            return interaction.editReply({
-                content: isEn ? `❌ An error occurred while communicating with Riot Games servers: ${err.message}` : `❌ Une erreur est survenue lors de l'interrogation des serveurs de jeu Riot Games : ${err.message}`
-            });
-        }
-    }
-
-    // 8. /leaderboard Command
+    // 7. /leaderboard Command
     if (commandName === 'leaderboard' || commandName === 'classement') {
         await interaction.deferReply({ ephemeral: false });
 
@@ -2315,9 +2136,8 @@ client.on('interactionCreate', async interaction => {
                     ? `**Official Valorant telemetry, store radar and match analysis.**\n\n` +
                       `⚙️ **/settings** • Interactive control panel: alert channel, @mentions, rank-up filters & language.\n` +
                       `📊 **/history [player] [mode]** • 50+ Match history, 5-game net RR Wheel, and interactive scoreboards.\n` +
-                      `🛒 **/store** • Live 24h rotating skin shop, wallet balances and Night Market discounts.\n` +
+                      `🛒 **/store** • Live 24h rotating skin shop and wallet balances.\n` +
                       `📈 **/session [player]** • Past 24h match performance recap, net RR win/loss and K/D.\n` +
-                      `🔍 **/scout [player]** • Live MMR, rank telemetry, headshot % and favorite weapons.\n` +
                       `🏆 **/leaderboard** • Server competitive squad standings.\n` +
                       `👥 **/follow [player]** • Follow players to get automated channel alerts upon match end.\n` +
                       `🗑️ **/unfollow [player]** • Stop following a player.\n` +
@@ -2327,9 +2147,8 @@ client.on('interactionCreate', async interaction => {
                     : `**Télémétrie Valorant officielle, radar de boutique et analyse de parties.**\n\n` +
                       `⚙️ **/settings** • Panneau de configuration interactif : salon, mentions @vous, filtres rankup & langue.\n` +
                       `📊 **/history [joueur] [mode]** • Historique 50+ matchs, roue RR 5 parties et scoreboards complets.\n` +
-                      `🛒 **/store** • Boutique du jour 24h en direct, soldes et Marché Nocturne.\n` +
+                      `🛒 **/store** • Boutique du jour 24h en direct et soldes VP/KC.\n` +
                       `📈 **/session [joueur]** • Rapport de performance des dernières 24h avec gain/perte net de RR.\n` +
-                      `🔍 **/scout [joueur]** • MMR en direct, statistiques détaillées et armes favorites.\n` +
                       `🏆 **/leaderboard** • Classement compétitif des membres du serveur.\n` +
                       `👥 **/follow [joueur]** • Suivre un joueur pour recevoir des alertes automatiques en fin de partie.\n` +
                       `🗑️ **/unfollow [joueur]** • Arrêter de suivre un joueur.\n` +

@@ -129,18 +129,6 @@ const commands = [
         ]
     },
     {
-        name: 'scout',
-        description: 'Analyser en direct le lobby et les rangs/stats des adversaires.',
-        options: [
-            {
-                name: 'joueur',
-                description: 'Optionnel: Pseudo#TAG du joueur à analyser',
-                type: ApplicationCommandOptionType.String,
-                required: false
-            }
-        ]
-    },
-    {
         name: 'leaderboard',
         description: 'Server competitive leaderboard (Top RR, Tiers, K/D).',
     },
