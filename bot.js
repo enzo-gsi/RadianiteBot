@@ -333,16 +333,18 @@ async function incrementBotStat(key, amount = 1) {
         if (existing) {
             await knex('bot_analytics').where({ key }).update({
                 count: parseInt(existing.count || 0) + amount,
-                updated_at: knex.fn.now()
+                updated_at: new Date().toISOString()
             });
         } else {
             await knex('bot_analytics').insert({
                 key,
                 count: amount,
-                updated_at: knex.fn.now()
+                updated_at: new Date().toISOString()
             });
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('[Bot] incrementBotStat error:', e.message);
+    }
 }
 
 async function syncGuildsAnalytics() {
@@ -356,19 +358,20 @@ async function syncGuildsAnalytics() {
             joinedAt: g.joinedTimestamp
         }));
 
+        const now = new Date().toISOString();
         const existing = await knex('bot_analytics').where({ key: 'bot_guilds' }).first();
         if (existing) {
             await knex('bot_analytics').where({ key: 'bot_guilds' }).update({
                 count: guilds.length,
                 meta: JSON.stringify(guilds),
-                updated_at: knex.fn.now()
+                updated_at: now
             });
         } else {
             await knex('bot_analytics').insert({
                 key: 'bot_guilds',
                 count: guilds.length,
                 meta: JSON.stringify(guilds),
-                updated_at: knex.fn.now()
+                updated_at: now
             });
         }
 
@@ -386,7 +389,10 @@ async function syncGuildsAnalytics() {
                 }
             } catch (e) {}
         }
-    } catch (e) {}
+        console.log(`[Bot] Guild analytics synced: ${guilds.length} servers.`);
+    } catch (e) {
+        console.warn('[Bot] syncGuildsAnalytics error:', e.message);
+    }
 }
 
 client.once('ready', async () => {
@@ -394,6 +400,9 @@ client.once('ready', async () => {
     await refreshValorantData();
     await registerSlashCommands();
     await syncGuildsAnalytics();
+
+    // Periodic sync every 5 minutes so panel always shows live guild/member counts
+    setInterval(syncGuildsAnalytics, 5 * 60 * 1000);
 });
 
 // Auto-register on new guild join & post interactive English welcome embed
