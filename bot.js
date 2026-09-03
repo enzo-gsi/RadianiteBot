@@ -744,7 +744,7 @@ async function renderSettingsPayload(discordId, guildId, isEn) {
                 inline: true
             },
             {
-                name: isEnglish ? '🎡 3D Rank Wheel' : '🎡 Roue de Rang 3D',
+                name: isEnglish ? '🎡 Rank Wheel' : '🎡 Roue de Rang',
                 value: showRankWheel ? '✅ **Enabled**' : '❌ **Disabled**',
                 inline: true
             },
