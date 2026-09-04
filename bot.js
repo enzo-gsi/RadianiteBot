@@ -347,6 +347,72 @@ async function incrementBotStat(key, amount = 1) {
     }
 }
 
+async function recordGuildCommand(guildId, commandName, channelName = null) {
+    if (!guildId) return;
+    try {
+        const gc = await knex('guild_configs').where({ guild_id: String(guildId) }).first();
+        let breakdown = {};
+        if (gc && gc.commands_breakdown) {
+            try { breakdown = typeof gc.commands_breakdown === 'string' ? JSON.parse(gc.commands_breakdown) : gc.commands_breakdown; } catch {}
+        }
+        breakdown[commandName] = (breakdown[commandName] || 0) + 1;
+
+        const now = new Date().toISOString();
+        const updateData = {
+            commands_count: (parseInt(gc?.commands_count) || 0) + 1,
+            commands_breakdown: JSON.stringify(breakdown),
+            last_command: commandName,
+            last_active_at: now,
+            updated_at: now
+        };
+        if (channelName && !gc?.channel_name) {
+            updateData.channel_name = channelName;
+        }
+
+        if (gc) {
+            await knex('guild_configs').where({ guild_id: String(guildId) }).update(updateData);
+        } else {
+            const guildObj = client.guilds.cache.get(String(guildId));
+            await knex('guild_configs').insert({
+                guild_id: String(guildId),
+                guild_name: guildObj?.name || 'Discord Server',
+                guild_icon: guildObj?.iconURL({ dynamic: true }) || null,
+                channel_name: channelName || null,
+                ...updateData
+            });
+        }
+    } catch (e) {
+        console.warn('[Bot] recordGuildCommand error:', e.message);
+    }
+}
+
+async function recordGuildNotification(guildId) {
+    if (!guildId) return;
+    try {
+        const now = new Date().toISOString();
+        const gc = await knex('guild_configs').where({ guild_id: String(guildId) }).first();
+        if (gc) {
+            await knex('guild_configs').where({ guild_id: String(guildId) }).update({
+                notifications_count: (parseInt(gc.notifications_count) || 0) + 1,
+                last_active_at: now,
+                updated_at: now
+            });
+        } else {
+            const guildObj = client.guilds.cache.get(String(guildId));
+            await knex('guild_configs').insert({
+                guild_id: String(guildId),
+                guild_name: guildObj?.name || 'Discord Server',
+                guild_icon: guildObj?.iconURL({ dynamic: true }) || null,
+                notifications_count: 1,
+                last_active_at: now,
+                updated_at: now
+            });
+        }
+    } catch (e) {
+        console.warn('[Bot] recordGuildNotification error:', e.message);
+    }
+}
+
 async function syncGuildsAnalytics() {
     try {
         const guilds = client.guilds.cache.map(g => ({
@@ -379,13 +445,26 @@ async function syncGuildsAnalytics() {
         for (const g of guilds) {
             try {
                 const gc = await knex('guild_configs').where({ guild_id: g.id }).first();
+                let chanName = null;
+                if (gc?.channel_id) {
+                    const ch = client.channels.cache.get(gc.channel_id);
+                    if (ch) chanName = ch.name;
+                }
                 if (!gc) {
                     await knex('guild_configs').insert({
                         guild_id: g.id,
                         guild_name: g.name,
                         guild_icon: g.icon,
+                        channel_name: chanName,
                         language: 'en'
                     });
+                } else {
+                    const up = {
+                        guild_name: g.name,
+                        guild_icon: g.icon || gc.guild_icon
+                    };
+                    if (chanName && !gc.channel_name) up.channel_name = chanName;
+                    await knex('guild_configs').where({ guild_id: g.id }).update(up);
                 }
             } catch (e) {}
         }
@@ -1626,6 +1705,9 @@ client.on('interactionCreate', async interaction => {
     const { commandName } = interaction;
     incrementBotStat(`cmd_${commandName}`);
     incrementBotStat('total_commands');
+    if (interaction.guildId) {
+        recordGuildCommand(interaction.guildId, commandName, interaction.channel?.name);
+    }
 
     // 0. /settings Command
     if (commandName === 'settings' || commandName === 'config') {
@@ -2648,6 +2730,9 @@ async function checkFollowedPlayers() {
                     components: actionComponents
                 });
                 incrementBotStat('match_notifications_sent');
+                if (channel.guild?.id) {
+                    recordGuildNotification(channel.guild.id);
+                }
 
             } catch (err) {
                 console.error(`[RadianiteBot] Erreur envoi vers salon ${userData.channel}:`, err.message);

@@ -49,6 +49,13 @@ async function initDatabase() {
                 notify_game_modes TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            ALTER TABLE guild_configs ADD COLUMN IF NOT EXISTS commands_count BIGINT DEFAULT 0;
+            ALTER TABLE guild_configs ADD COLUMN IF NOT EXISTS notifications_count BIGINT DEFAULT 0;
+            ALTER TABLE guild_configs ADD COLUMN IF NOT EXISTS commands_breakdown TEXT;
+            ALTER TABLE guild_configs ADD COLUMN IF NOT EXISTS channel_name VARCHAR(128);
+            ALTER TABLE guild_configs ADD COLUMN IF NOT EXISTS last_command VARCHAR(64);
+            ALTER TABLE guild_configs ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP;
         `);
     } catch (err) {}
 }
