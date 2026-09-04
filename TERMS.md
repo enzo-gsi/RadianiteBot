@@ -16,7 +16,7 @@ RadianiteBot fournit des outils statistiques et utilitaires pour la communauté 
 - Consultation de la boutique quotidienne et Marché Nocturne.
 - Alertes automatiques de fin de match.
 - Alertes privées de Wishlist de skins.
-- Dossiers de scouting tactique (`/scout`) et classements de serveurs (`/classement`).
+- Historique des parties (`/history`), bilans de session (`/session`) et classements de serveurs (`/leaderboard`).
 
 ---
 

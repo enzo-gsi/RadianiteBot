@@ -1,8 +1,13 @@
 {
   "name": "radianite-discord-bot",
   "version": "2.0.0",
-  "description": "RadianiteDB Automated Discord Notification & Storefront Bot",
+  "description": "Official RadianiteDB Discord Bot • Live Valorant match tracking, 24h store & wishlist alerts, scoreboards and server leaderboards.",
   "main": "bot.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enzo-gsi/RadianiteBot.git"
+  },
+  "license": "MIT",
   "scripts": {
     "start": "node bot.js",
     "deploy": "node deploy-commands.js"

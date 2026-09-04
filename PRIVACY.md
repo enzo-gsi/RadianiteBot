@@ -21,7 +21,7 @@ Vos données sont utilisées exclusivement pour :
 1. Afficher votre boutique quotidienne Valorant en direct, vos soldes VP/RP/KC et le Marché Nocturne.
 2. Détecter et envoyer les alertes de fin de partie (DuoQ / TrioQ / 5-Stack).
 3. Envoyer des alertes par Message Privé (MP) lorsqu'un skin de votre Wishlist apparaît à 02h00.
-4. Calculer les classements compétitifs de serveur (`/classement`) et briefings de session quotidiens à 10h00 (`/session`).
+4. Calculer les classements compétitifs de serveur (`/leaderboard`) et briefings de session quotidiens à 10h00 (`/session`).
 
 ---
 
