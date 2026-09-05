@@ -10,39 +10,11 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.radianitedb.lol/"/>
   </url>
   <url>
-    <loc>https://www.radianitedb.lol/bot</loc>
+    <loc>https://www.radianitedb.lol/app</loc>
     <lastmod>2026-09-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/bot"/>
-  </url>
-  <url>
-    <loc>https://www.radianitedb.lol/store</loc>
-    <lastmod>2026-09-05</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/store"/>
-  </url>
-  <url>
-    <loc>https://www.radianitedb.lol/leaderboard</loc>
-    <lastmod>2026-09-05</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/leaderboard"/>
-  </url>
-  <url>
-    <loc>https://www.radianitedb.lol/compare</loc>
-    <lastmod>2026-09-05</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/compare"/>
-  </url>
-  <url>
-    <loc>https://www.radianitedb.lol/armory</loc>
-    <lastmod>2026-09-05</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/armory"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/app"/>
   </url>
   <url>
     <loc>https://www.radianitedb.lol/legal</loc>
