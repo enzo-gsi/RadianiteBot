@@ -10,11 +10,46 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.radianitedb.lol/"/>
   </url>
   <url>
-    <loc>https://www.radianitedb.lol/app</loc>
+    <loc>https://www.radianitedb.lol/store</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/store"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/leaderboard</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/leaderboard"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/bot</loc>
     <lastmod>2026-09-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/app"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/bot"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/compare</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/compare"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/armory</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/armory"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/private-tracker</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/private-tracker"/>
   </url>
   <url>
     <loc>https://www.radianitedb.lol/legal</loc>
@@ -36,5 +71,264 @@
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
     <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/privacy"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/avokk/swag</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/avokk/swag"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/chronicle/1337</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/chronicle/1337"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/desire%20doue%2014/12345</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/desire%20doue%2014/12345"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/desir%C3%A9%20dou%C3%A9%2014/12345</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/desir%C3%A9%20dou%C3%A9%2014/12345"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/devicehp/ailee</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/devicehp/ailee"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/dnwr/num%201</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/dnwr/num%201"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/doonko/zelia</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/doonko/zelia"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/elephantmacabre/123</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/elephantmacabre/123"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/els%20jager/sko</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/els%20jager/sko"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/embo/gai</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/embo/gai"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/emilio/16y</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/emilio/16y"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/ewen/chad</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/ewen/chad"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/fat%20snickers/lserq</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/fat%20snickers/lserq"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/geas/3619</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/geas/3619"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/jl%20pa1ze/ttv</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/jl%20pa1ze/ttv"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/maddy%20comma/6609</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/maddy%20comma/6609"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/meowmiii/naomi</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/meowmiii/naomi"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/metroneo/17yo</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/metroneo/17yo"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/nanikka/euw</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/nanikka/euw"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/paul%20atreides/psg7</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/paul%20atreides/psg7"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/ph%C3%B4/chi</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/ph%C3%B4/chi"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/randomplayer/win00</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/randomplayer/win00"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/scream/1337</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/scream/1337"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/shynai%20aim/salut</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/shynai%20aim/salut"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/smooth%20operator/667</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/smooth%20operator/667"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/starkill4r/6861</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/starkill4r/6861"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/sua/oo7</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/sua/oo7"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/tenz/sen</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/tenz/sen"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/the%20lazy%20neon/2009</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/the%20lazy%20neon/2009"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/xwen/daddy</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/xwen/daddy"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/Maxoupicsou/lebot</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/Maxoupicsou/lebot"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/Rabibinator/EUW</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/Rabibinator/EUW"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/LolVStein/1131</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/LolVStein/1131"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/Titans%20Will/EUW</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/Titans%20Will/EUW"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/Nephyz/EUW</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/Nephyz/EUW"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/KENCHOUU/EUW</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/KENCHOUU/EUW"/>
+  </url>
+  <url>
+    <loc>https://www.radianitedb.lol/tracker/Demon1/NRG</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.radianitedb.lol/tracker/Demon1/NRG"/>
   </url>
 </urlset>
