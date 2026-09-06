@@ -211,6 +211,18 @@ const commands = [
                 ]
             }
         ]
+    },
+    {
+        name: 'analyse',
+        description: 'Analyse tactique complète d\'un joueur Valorant (Score Radianite, Grade, Forces & Faiblesses).',
+        options: [
+            {
+                name: 'joueur',
+                description: 'Pseudo#TAG du joueur à analyser (ex: TenZ#SEN ou JL Pa1ze#TTV)',
+                type: ApplicationCommandOptionType.String,
+                required: true
+            }
+        ]
     }
 ];
 

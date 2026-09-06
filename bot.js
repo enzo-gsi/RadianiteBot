@@ -2349,6 +2349,139 @@ client.on('interactionCreate', async interaction => {
             });
         }
     }
+
+    // 14. /analyse Command (Radianite Tactical Analysis Engine)
+    if (commandName === 'analyse' || commandName === 'analyze') {
+        await interaction.deferReply({ ephemeral: false });
+        const isEn = (await getUserLang(interaction.user.id)) === 'en';
+        let targetRiotId = interaction.options.getString('joueur') || interaction.options.getString('player');
+
+        if (!targetRiotId) {
+            const user = await knex('users').where({ discord_id: interaction.user.id }).first();
+            if (user?.riot_auth) {
+                try {
+                    const session = decryptData(user.riot_auth);
+                    if (session.gameName && session.tagLine) {
+                        targetRiotId = `${session.gameName}#${session.tagLine}`;
+                    }
+                } catch (e) {}
+            }
+        }
+
+        if (!targetRiotId || !targetRiotId.includes('#')) {
+            return interaction.editReply({
+                content: isEn
+                    ? `❌ **Please provide a valid Riot ID with tag** (e.g. \`/analyse joueur:TenZ#SEN\`).`
+                    : `❌ **Veuillez spécifier un Riot ID valide avec son tag** (ex: \`/analyse joueur:TenZ#SEN\`).`
+            });
+        }
+
+        const [pName, pTag] = targetRiotId.split('#');
+
+        try {
+            const res = await localApi.get(`/api/stats/${encodeURIComponent(pName.trim())}/${encodeURIComponent(pTag.trim())}`, { timeout: 15000 });
+            const data = res.data;
+
+            if (!data || !data.playerInfo) {
+                throw new Error("Données de joueur indisponibles");
+            }
+
+            const score = data.radianiteScore?.score || 500;
+            const grade = data.radianiteScore?.grade || 'B';
+            const form = data.radianiteAnalysis?.form || { emoji: '⚖️', label: 'Stable' };
+            const rankName = data.rankInfo?.rankName || 'Unranked';
+            const rr = data.rankInfo?.rr || 0;
+            const rankIcon = data.rankInfo?.rankImageUrl || '';
+            const avatar = data.playerInfo?.avatarUrl || '';
+
+            const sub = data.radianiteScore?.subScores || {};
+            const overview = data.overviewStats || {};
+
+            const gradeColors = {
+                'S+': 0xff4655,
+                'S': 0x00f5a0,
+                'A': 0x00d2ff,
+                'B': 0x38bdf8,
+                'C': 0xfacc15,
+                'D': 0xef4444
+            };
+            const embedColor = gradeColors[grade] || 0x00f5a0;
+
+            const profileUrl = `${YOUR_WEBSITE_URL}/tracker/${encodeURIComponent(pName.trim())}/${encodeURIComponent(pTag.trim())}`;
+
+            const analysisEmbed = new EmbedBuilder()
+                .setTitle(isEn ? `⚡ RADIANITE COMMAND CENTER // ${data.playerInfo.name}` : `⚡ RADIANITE COMMAND CENTER // ${data.playerInfo.name}`)
+                .setURL(profileUrl)
+                .setColor(embedColor)
+                .setThumbnail(rankIcon || avatar)
+                .setDescription(
+                    `💎 **Score Radianite :** \`${score}/1000\` • **Grade :** \`[ ${grade} ]\`\n` +
+                    `🔥 **${isEn ? 'Recent Form' : 'Forme Récente'} :** ${form.emoji || '🔥'} **${form.label || 'On Fire'}**\n` +
+                    `🏆 **${isEn ? 'Current Tier' : 'Rang Actuel'} :** **${rankName}** (${rr} RR)\n` +
+                    `────────────────────────────────────────`
+                )
+                .addFields(
+                    {
+                        name: isEn ? '📊 Key Performance Metrics' : '📊 Métriques Clés',
+                        value: `> ⚔️ **K/D :** **${overview.kd || '0.00'}** | 🏆 **Win Rate :** **${overview.winRate || 0}%**\n` +
+                               `> 💥 **ACS :** **${overview.acs || '0.0'}** | 🎯 **Headshot :** **${overview.hsPercent || 0}%**`,
+                        inline: false
+                    },
+                    {
+                        name: isEn ? '🎯 7 Tactical Sub-Scores (0-100)' : '🎯 7 Sous-scores Tactiques (0-100)',
+                        value: `> ⚔️ **Combat :** \`${sub.combat || 50}\` • 🎯 **Aim :** \`${sub.aim || 50}\` • 💥 **Impact :** \`${sub.impact || 50}\`\n` +
+                               `> 🚪 **Entry :** \`${sub.entry || 50}\` • 🛡️ **Support :** \`${sub.support || 50}\` • 🧠 **Clutch :** \`${sub.clutch || 50}\`\n` +
+                               `> ⚖️ **Régularité :** \`${sub.consistency || 50}\``,
+                        inline: false
+                    }
+                );
+
+            // Coach Priority 1
+            if (data.radianiteAnalysis?.priorities?.length > 0) {
+                const p1 = data.radianiteAnalysis.priorities[0];
+                analysisEmbed.addFields({
+                    name: isEn ? `🎯 Coach Priority #1 [${p1.level}]` : `🎯 Priorité #1 du Coach Radianite [${p1.level}]`,
+                    value: `> **${p1.title}**\n> 💡 *${p1.action}*`,
+                    inline: false
+                });
+            }
+
+            // Road to Rank
+            if (data.radianiteAnalysis?.roadToRank) {
+                const road = data.radianiteAnalysis.roadToRank;
+                analysisEmbed.addFields({
+                    name: isEn ? '🚀 Road to Next Rank' : '🚀 Road to Next Rank',
+                    value: `> **${road.nextRank || 'Rang Supérieur'}** : encore **${road.rrNeeded || 0} RR** (estimé à ~**${road.estimatedGamesToRankUp || 5} parties**)`,
+                    inline: false
+                });
+            }
+
+            analysisEmbed
+                .setFooter({ text: 'RadianiteDB • 0€ AI Analytics Engine • radianitedb.lol' })
+                .setTimestamp();
+
+            const buttonRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setLabel(isEn ? 'Open Full Command Center (10 Tabs)' : 'Ouvrir le Command Center (10 Onglets)')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(profileUrl)
+                    .setEmoji('🚀')
+            );
+
+            return interaction.editReply({
+                embeds: [analysisEmbed],
+                components: [buttonRow]
+            });
+
+        } catch (err) {
+            console.error(`[RadianiteBot] Erreur /analyse pour ${targetRiotId}:`, err.message);
+            return interaction.editReply({
+                content: isEn
+                    ? `❌ Unable to generate analysis for **${targetRiotId}**. Please check that the Riot ID exists on [RadianiteDB](${YOUR_WEBSITE_URL}).`
+                    : `❌ Impossible de générer l'analyse pour **${targetRiotId}**. Vérifiez que le joueur existe sur [RadianiteDB](${YOUR_WEBSITE_URL}).`
+            });
+        }
+    }
 });
 
 // Autocomplete Interaction Handler for Wishlist
@@ -2378,6 +2511,69 @@ client.on('interactionCreate', async interaction => {
 
 // Sleep helper to prevent API rate-limits
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// --- ACHIEVEMENT UNLOCK DETECTION HELPER ---
+async function checkAndAnnounceAchievements(riotId, channel, isEn = false) {
+    if (!riotId || !channel) return;
+    try {
+        const [pName, pTag] = riotId.split('#');
+        if (!pName || !pTag) return;
+
+        const res = await localApi.get(`/api/player/${encodeURIComponent(pName.trim())}/${encodeURIComponent(pTag.trim())}/achievements`, { timeout: 8000 });
+        const achData = res.data;
+        if (!achData || !achData.achievements) return;
+
+        const memoryKey = `${riotId.toLowerCase()}_unlocked_achievements`;
+        const knownRow = await knex('bot_memory').where({ riot_id: memoryKey }).first();
+        let knownUnlocked = [];
+        try {
+            knownUnlocked = knownRow ? JSON.parse(knownRow.last_match_id || '[]') : [];
+        } catch (e) {}
+
+        const currentUnlocked = achData.achievements.filter(a => a.unlocked).map(a => a.id);
+        const newlyUnlocked = achData.achievements.filter(a => a.unlocked && !knownUnlocked.includes(a.id));
+
+        if (newlyUnlocked.length > 0) {
+            for (const ach of newlyUnlocked) {
+                const rarityColors = {
+                    'mythic': 0xff4655,
+                    'legendary': 0xf59e0b,
+                    'epic': 0xa855f7,
+                    'rare': 0x38bdf8,
+                    'common': 0x94a3b8
+                };
+                const color = rarityColors[(ach.rarity || '').toLowerCase()] || 0x00f5a0;
+
+                const achEmbed = new EmbedBuilder()
+                    .setTitle(isEn ? `🏆 NEW TACTICAL ACHIEVEMENT UNLOCKED!` : `🏆 NOUVEAU SUCCÈS TACTIQUE DÉBLOQUÉ !`)
+                    .setColor(color)
+                    .setDescription(
+                        isEn 
+                            ? `Congratulations to **${riotId}** for conquering a new milestone on **RadianiteDB**!\n\n` +
+                              `### ${ach.icon || '🏅'} **${ach.name}** \`[${(ach.rarity || 'Common').toUpperCase()}]\`\n` +
+                              `> *${ach.description}*\n`
+                            : `Félicitations à **${riotId}** qui vient de décrocher une nouvelle médaille tactique sur **RadianiteDB** !\n\n` +
+                              `### ${ach.icon || '🏅'} **${ach.name}** \`[${(ach.rarity || 'Common').toUpperCase()}]\`\n` +
+                              `> *${ach.description}*\n`
+                    )
+                    .setThumbnail('https://media.valorant-api.com/competitivetiers/564d8e28-c226-3180-6285-e48a390db8b1/27/largeicon.png')
+                    .setFooter({ text: 'RadianiteDB Achievements • radianitedb.lol/achievements' })
+                    .setTimestamp();
+
+                await channel.send({ embeds: [achEmbed] }).catch(() => {});
+            }
+
+            const updatedList = JSON.stringify(currentUnlocked);
+            if (knownRow) {
+                await knex('bot_memory').where({ riot_id: memoryKey }).update({ last_match_id: updatedList });
+            } else {
+                await knex('bot_memory').insert({ riot_id: memoryKey, last_match_id: updatedList });
+            }
+        }
+    } catch (e) {
+        // Silent fail to avoid interrupting core match alerts
+    }
+}
 
 // --- VALORANT MATCH ENGINE (WITH DUOQ, TRIOQ, 5-STACK GROUPING) ---
 async function checkFollowedPlayers() {
@@ -2732,6 +2928,11 @@ async function checkFollowedPlayers() {
                 incrementBotStat('match_notifications_sent');
                 if (channel.guild?.id) {
                     recordGuildNotification(channel.guild.id);
+                }
+
+                // Check and announce newly unlocked tactical achievements
+                for (const pData of squadPlayers) {
+                    await checkAndAnnounceAchievements(pData.riotId, channel, isEn);
                 }
 
             } catch (err) {
